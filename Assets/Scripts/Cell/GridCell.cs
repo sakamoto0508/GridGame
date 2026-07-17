@@ -1,20 +1,40 @@
 using UnityEngine;
-using UnityEngine.Rendering;
 
-public struct GridCell
+public class GridCell
 {
+    public GridCell(Vector3Int gridPos, bool isWalkable)
+    {
+        GridPos = gridPos;
+        IsWalkable = isWalkable;
+    }
+
     /// <summary> グリッド座標 </summary>
-    Vector3Int GridPos;
+    public Vector3Int GridPos { get; private set; }
 
     /// <summary> このマスに乗れるか </summary>
-    bool IsWalkable;
+    public bool IsWalkable { get; private set; }
 
     /// <summary> このマスにいるオブジェクト </summary>
-    GameObject OccupyingObject;
+    public GameObject OccupyingObject { get; private set; }
 
     /// <summary> ボム </summary>
     //GameObject Bomb;
 
     /// <summary> アイテム </summary>
     //GameObject Item;
+
+    public void SetWalkable(bool isWalkable)
+    {
+        IsWalkable = isWalkable;
+    }
+
+    public void SetOccupyingObject(GameObject obj)
+    {
+        OccupyingObject = obj;
+    }
+
+    public void ResetCell()
+    {
+        OccupyingObject = null;
+    }
 }
