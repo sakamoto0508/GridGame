@@ -1,5 +1,3 @@
-using NUnit.Framework;
-using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
@@ -16,154 +14,150 @@ public class GridManager : MonoBehaviour
     [SerializeField] private int _sizeX = 7;
     [SerializeField] private int _sizeY = 7;
     [SerializeField] private int _sizeZ = 7;
+    [SerializeField] private float _cellSize = 1.0f;
 
-    GridCell[][][] _cells;
+    [SerializeField] private CharacterBase _character;
+    private GridCell[][][] _cells;
 
     private void Awake()
     {
-        InitGrid();
+        InitializeGrid();
     }
 
-    private void InitGrid()
+    private void InitializeGrid()
     {
         _cells = new GridCell[_sizeX][][];
-        for (int i = 0; i < _sizeX; i++)
+        for (int x = 0; x < _sizeX; x++)
         {
-            _cells[i] = new GridCell[_sizeY][];
-            for (int j = 0; j < _sizeY; j++)
+            _cells[x] = new GridCell[_sizeY][];
+            for (int y = 0; y < _sizeY; y++)
             {
-                _cells[i][j] = new GridCell[_sizeZ];
-                for (int k = 0; k < _sizeZ; k++)
+                _cells[x][y] = new GridCell[_sizeZ];
+                for (int z = 0; z < _sizeZ; z++)
                 {
-                    _cells[i][j][k] = new GridCell(new Vector3Int(i, j, k), true);
+                    // グリッド座標を計算し、GridCellを生成して格納する
+                    // グリッド座標はスタート位置を考慮して計算する
+                    Vector3Int position = new Vector3Int(x, y, z);
+                    _cells[x][y][z] = new GridCell(position);
                 }
             }
         }
     }
 
     /// <summary>
-    /// 指定された座標のマスを取得する
+    /// 指定されたグリッド座標に対応するGridCellを取得する。
     /// </summary>
-    /// <param name="gridPos"></param>
+    /// <param name="position"></param>
     /// <returns></returns>
-    public GridCell GetCell(Vector3Int gridPos)
+    private GridCell GetCell(Vector3Int position)
     {
-        if (!IsInsideGrid(gridPos))
+        if (!Contains(position))
             return null;
-
-        return _cells[gridPos.x][gridPos.y][gridPos.z];
+        return _cells[position.x][position.y][position.z];
     }
 
     /// <summary>
-    /// (X,Y,Z) を Cells の配列インデックスへ変換する。
+    /// 指定されたグリッド座標がグリッド内に存在するかどうかを判定する。
     /// </summary>
-    public int GetGridIndex(Vector3Int gridPos)
-    {
-        return gridPos.x + gridPos.y * _sizeX + gridPos.z * _sizeX * _sizeY;
-    }
-
-    /// <summary>
-    /// 指定された座標がグリッド内にあるかどうかを判定する。
-    /// </summary>
-    /// <param name="gridPos"></param>
+    /// <param name="position"></param>
     /// <returns></returns>
-    public bool IsInsideGrid(Vector3Int gridPos)
-    {
-        return gridPos.x >= 0 && gridPos.x < _sizeX &&
-               gridPos.y >= 0 && gridPos.y < _sizeY &&
-               gridPos.z >= 0 && gridPos.z < _sizeZ;
-    }
+    public bool Contains(Vector3Int position)
+    => GridUtility.IsInside(position, new Vector3Int(_sizeX, _sizeY, _sizeZ));
 
     /// <summary>
-    /// グリッド座標をワールド座標に変換する。
+    /// 指定されたグリッド座標をワールド座標に変換する。
     /// </summary>
-    /// <param name="gridPos"></param>
+    /// <param name="position"></param>
     /// <returns></returns>
-    public Vector3 GetWorldLocation(Vector3Int gridPos)
-    {
-        // グリッド座標をワールド座標に変換する処理を実装
-        return Vector3.zero;
-    }
-
+    public Vector3 GetWorldPosition(Vector3Int position)
+        => GridUtility.GridToWorld(position, _cellSize, transform.position);
 
     /// <summary>
-    /// 指定された座標のマスに移動可能かどうかを判定する。
+    /// 指定されたワールド座標をグリッド座標に変換する。
     /// </summary>
-    public bool IsWalkble(Vector3Int gridPos)
-    {
-        GridCell cell = GetCell(gridPos);
+    /// <param name="worldPosition"></param>
+    /// <returns></returns>
+    public Vector3Int GetGridPosition(Vector3 worldPosition)
+        => GridUtility.WorldToGrid(worldPosition, _cellSize, transform.position);
 
-        if (cell == null)
+    /// <summary>
+    /// 指定されたグリッド座標にキャラクターが入れるかどうかを判定する。
+    /// </summary>
+    /// <param name="position"></param>
+    /// <returns></returns>
+    public bool CanEnter(Vector3Int position)
+    {
+        if (!Contains(position))
             return false;
-        if(!cell.IsWalkable)
+        GridCell cell = GetCell(position);
+        return cell != null && cell.IsWalkable;
+    }
+
+    /// <summary>
+    /// 指定されたグリッド座標から別のグリッド座標にキャラクターを移動させる。
+    /// </summary>
+    /// <param name="from"></param>
+    /// <param name="to"></param>
+    /// <param name="character"></param>
+    /// <returns></returns>
+    public bool TryMoveCharacter(Vector3Int from, Vector3Int to, CharacterBase character)
+    {
+        GridCell fromCell = GetCell(from);
+        GridCell toCell = GetCell(to);
+        if (fromCell == null || toCell == null)
             return false;
-        if(cell.OccupyingObject != null)
+        if (!toCell.IsWalkable)
             return false;
+        // 先に移動先を確保する
+        if (!toCell.TrySetCharacter(character))
+            return false;
+        // 移動元の解除に失敗したら元へ戻す
+        if (!fromCell.RemoveCharacter(character))
+        {
+            toCell.RemoveCharacter(character);
+            return false;
+        }
 
         return true;
     }
 
-    //引数にplayerやボムを必要とするので後で書く。
     /// <summary>
-    /// キャラクターを移動させる。
+    /// 指定されたグリッド座標にキャラクターを登録する。
     /// </summary>
-    //public bool MoveCharacter()
-
-    /// <summary>
-    /// ボムを設置する。設置できたらtrue
-    /// </summary>
-    //public bool PlaceBomb()
-
-    /// <summary>
-    /// ボムを削除する。
-    /// </summary>
-    //public bool RemoveBomb()
-
-    /// <summary>
-    /// ブロックを設置する。設置できたらtrue
-    /// </summary>
-    //public bool PlaceBlock()
-
-    /// <summary>
-    /// ブロックを削除する。
-    /// </summary>  
-    //public bool RemoveBlock()
-
-    /// <summary>
-    /// アイテムを設置する。設置できたらtrue
-    /// </summary>
-    //public bool PlaceItem()
-
-    /// <summary>
-    /// アイテムを削除する。
-    /// </summary>
-    //public bool RemoveItem()
-
-    /// <summary>
-    /// 上下左右前後の隣接するマスを取得する。
-    /// </summary>
-    public List<GridCell> GetNeighborCells(Vector3Int gridPos)
-    {
-
-    }
-
-    /// <summary>
-    /// ランダムな空きマスを返す。
-    /// アイテムや敵のスポーンに使う。
-    /// </summary>
+    /// <param name="position"></param>
+    /// <param name="character"></param>
     /// <returns></returns>
-    public GridCell GetRandomEmptyCell()
+    public bool TryRegisterCharacter(Vector3Int position,CharacterBase character)
     {
+        GridCell cell = GetCell(position);
+
+        if (cell == null || !cell.IsWalkable)
+            return false;
+
+        return cell.TrySetCharacter(character);
     }
 
     /// <summary>
-    /// セル情報をリセットする。
+    /// 指定されたグリッド座標からキャラクターを登録解除する。
     /// </summary>
-    public void ClearCell(Vector3Int pos)
+    /// <param name="position"></param>
+    /// <param name="character"></param>
+    /// <returns></returns>
+    public bool TryUnregisterCharacter(Vector3Int position, CharacterBase character)
     {
-        if (!IsInsideGrid(pos))
-            return;
+        GridCell cell = GetCell(position);
 
-        _cells[pos.x][pos.y][pos.z].ResetCell();
+        if(cell == null)
+            return false;
+
+        return cell.RemoveCharacter(character);
+    }
+
+    /// <summary>
+    /// Gizmosを描画するためのメソッド。Unityエディタ上でグリッドの可視化に使用される。
+    /// </summary>
+    private void OnDrawGizmos()
+    {
+
     }
 }

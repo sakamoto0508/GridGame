@@ -1,40 +1,54 @@
 using UnityEngine;
 
+/// <summary>
+/// グリッド上の1つのセルを表すクラス
+/// </summary>
 public class GridCell
 {
-    public GridCell(Vector3Int gridPos, bool isWalkable)
+    public GridCell(Vector3Int position)
     {
-        GridPos = gridPos;
-        IsWalkable = isWalkable;
+        Position = position;
     }
 
-    /// <summary> グリッド座標 </summary>
-    public Vector3Int GridPos { get; private set; }
+    public Vector3Int Position { get; }
 
-    /// <summary> このマスに乗れるか </summary>
-    public bool IsWalkable { get; private set; }
+    public Block Block { get; private set; }
+    public Bomb Bomb { get; private set; }
+    public Item Item { get; private set; }
+    public CharacterBase Character { get; private set; }
 
-    /// <summary> このマスにいるオブジェクト </summary>
-    public GameObject OccupyingObject { get; private set; }
+    public bool IsReserved { get; private set; }
 
-    /// <summary> ボム </summary>
-    //GameObject Bomb;
+    public bool IsWalkable =>
+        Block == null &&
+        Character == null &&
+        !IsReserved;
 
-    /// <summary> アイテム </summary>
-    //GameObject Item;
-
-    public void SetWalkable(bool isWalkable)
+    /// <summary>
+    /// 指定されたキャラクターをこのセルに設定しようとします。
+    /// </summary>
+    /// <param name="character"></param>
+    /// <returns></returns>
+    public bool TrySetCharacter(CharacterBase character)
     {
-        IsWalkable = isWalkable;
+        if (character == null || Character != null || IsReserved)
+            return false;
+
+        Character = character;
+        return true;
     }
 
-    public void SetOccupyingObject(GameObject obj)
+    /// <summary>
+    /// 指定されたキャラクターをこのセルから削除しようとします。
+    /// </summary>
+    /// <param name="character"></param>
+    /// <returns></returns>
+    public bool RemoveCharacter(CharacterBase character)
     {
-        OccupyingObject = obj;
-    }
+        if (Character != character)
+            return false;
 
-    public void ResetCell()
-    {
-        OccupyingObject = null;
+        Character = null;
+        return true;
     }
 }
