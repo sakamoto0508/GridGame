@@ -39,6 +39,19 @@ public class GridCell
     }
 
     /// <summary>
+    /// 指定されたブロックをこのセルに設定しようとします。
+    /// </summary>
+    /// <param name="block"></param>
+    /// <returns></returns>
+    public bool TrySetBlock(Block block)
+    {
+        if (block == null || Block != null)
+            return false;
+        Block = block;
+        return true;
+    }
+
+    /// <summary>
     /// 指定されたキャラクターをこのセルから削除しようとします。
     /// </summary>
     /// <param name="character"></param>
@@ -49,6 +62,19 @@ public class GridCell
             return false;
 
         Character = null;
+        return true;
+    }
+    
+    /// <summary>
+    /// 指定されたブロックをこのセルから削除しようとします。
+    /// </summary>
+    /// <param name="block"></param>
+    /// <returns></returns>
+    public bool RemoveBlock(Block block)
+    {
+        if (Block != block)
+            return false;
+        Block = null;
         return true;
     }
 }

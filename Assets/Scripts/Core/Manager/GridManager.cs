@@ -11,6 +11,7 @@ using UnityEngine;
 /// </summary>
 public class GridManager : MonoBehaviour
 {
+    public Vector3Int Size => new Vector3Int(_sizeX, _sizeY, _sizeZ);
     [SerializeField] private int _sizeX = 7;
     [SerializeField] private int _sizeY = 7;
     [SerializeField] private int _sizeZ = 7;
@@ -151,6 +152,34 @@ public class GridManager : MonoBehaviour
             return false;
 
         return cell.RemoveCharacter(character);
+    }
+
+    /// <summary>
+    /// 指定されたグリッド座標にブロックを配置する。
+    /// </summary>
+    /// <param name="position"></param>
+    /// <param name="block"></param>
+    /// <returns></returns>
+    public bool TryRegisterBlock(Vector3Int position, Block block)
+    {
+        GridCell cell = GetCell(position);
+        if (cell == null || !cell.IsWalkable)
+            return false;
+        return cell.TrySetBlock(block);
+    }
+
+    /// <summary>
+    /// 指定されたグリッド座標からブロックを削除する。
+    /// </summary>
+    /// <param name="position"></param>
+    /// <param name="block"></param>
+    /// <returns></returns>
+    public bool TryUnregisterBlock(Vector3Int position, Block block)
+    {
+        GridCell cell = GetCell(position);
+        if (cell == null || cell.Block != block)
+            return false;
+        return cell.RemoveBlock(block);
     }
 
     /// <summary>
