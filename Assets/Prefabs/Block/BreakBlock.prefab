@@ -14,7 +14,7 @@ GameObject:
   - component: {fileID: 4642536856958659777}
   - component: {fileID: 1599753650031697247}
   m_Layer: 0
-  m_Name: Block
+  m_Name: BreakBlock
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -68,7 +68,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 0c36f4df9a27899489330fe5c8128daf, type: 2}
+  - {fileID: 2100000, guid: 56f19129c90917d4986044fffb8dc83e, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -125,4 +125,4 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3f80eabd14481624e840c74729b69831, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Block
-  _blockType: 1
+  _blockType: 0

@@ -7,20 +7,62 @@ using UnityEngine.InputSystem;
 public class PlayerController : MonoBehaviour
 {
     [SerializeField] private MovementComponent _movementComponent;
-    [SerializeField] private Camera _camera;
+    [SerializeField] private BlockPlacementComponent _blockPlacementComponent;
+    private Camera _camera;
+    private Vector2 _moveInput;
 
+    /// <summary>Spawnerからゲーム用Cameraを受け取ります。</summary>
+    public void Init(Camera gameCamera)
+    {
+        _camera= gameCamera;
+    }
+
+    /// <summary>
+    /// 移動入力を保存し、入力開始時にカメラ基準の水平移動を要求します。
+    /// 保存した入力は方向付きジャンプにも利用します。
+    /// </summary>
     public void OnMove(InputAction.CallbackContext context)
     {
+        _moveInput = context.ReadValue<Vector2>();
+
         if (!context.performed)
             return;
 
-        Vector2 input = context.ReadValue<Vector2>();
-        Vector3Int direction = ConvertToGridDirection(input);
+        Vector3Int direction = ConvertToGridDirection(_moveInput);
 
         if (direction != Vector3Int.zero)
         {
             _movementComponent.TryMove(direction);
         }
+    }
+
+    /// <summary>
+    /// 現在押されている方向でジャンプします。方向入力がなければその場ジャンプになります。
+    /// </summary>
+    public void OnJump(InputAction.CallbackContext context)
+    {
+        if (!context.started)
+            return;
+
+        Vector3Int direction = ConvertToGridDirection(_moveInput);
+        _movementComponent.TryJump(direction);
+    }
+
+    /// <summary>地上では正面、ジャンプ中では直下へのBlock配置を要求します。</summary>
+    public void OnPlaceBlock(InputAction.CallbackContext context)
+    {
+        if (!context.started)
+            return;
+
+        if (_blockPlacementComponent == null)
+        {
+            Debug.LogWarning(
+                "Block配置入力を受け取りましたが、PlayerControllerのBlock Placement Componentが未設定です。",
+                this);
+            return;
+        }
+
+        _blockPlacementComponent.TryPlaceBlock();
     }
 
     /// <summary>
@@ -44,18 +86,11 @@ public class PlayerController : MonoBehaviour
         Vector3 desiredDirection = cameraRight * input.x + cameraForward * input.y;
 
         // 斜め移動を防ぎ、X/Zの強い方向へ丸める
-        if (Mathf.Abs(desiredDirection.x) >
-            Mathf.Abs(desiredDirection.z))
+        if (Mathf.Abs(desiredDirection.x) > Mathf.Abs(desiredDirection.z))
         {
-            return new Vector3Int(
-                desiredDirection.x > 0f ? 1 : -1,
-                0,
-                0);
+            return new Vector3Int(desiredDirection.x > 0f ? 1 : -1, 0, 0);
         }
 
-        return new Vector3Int(
-            0,
-            0,
-            desiredDirection.z > 0f ? 1 : -1);
+        return new Vector3Int(0, 0, desiredDirection.z > 0f ? 1 : -1);
     }
 }
