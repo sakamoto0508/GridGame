@@ -273,7 +273,7 @@ public class GridManager : MonoBehaviour
         GridCell toCell = GetCell(to);
         if (fromCell == null || toCell == null)
             return false;
-        if (!toCell.IsWalkable)
+        if (!CanCharacterEnter(to))
             return false;
         // 先に移動先を確保する
         if (!toCell.TrySetCharacter(character))
@@ -289,6 +289,22 @@ public class GridManager : MonoBehaviour
     }
 
     /// <summary>
+    /// 指定されたグリッド座標にキャラクターが進入できるかを判定します。
+    /// </summary>
+    /// <param name="position"></param>
+    /// <returns></returns>
+    public bool CanCharacterEnter(Vector3Int position)
+    {
+        GridCell cell = GetCell(position);
+
+        return cell != null &&
+           cell.Block == null &&
+           cell.Bomb == null &&
+           cell.Character == null &&
+           !cell.IsReserved;
+    }
+
+    /// <summary>
     /// 指定されたグリッド座標にキャラクターを登録する。
     /// </summary>
     /// <param name="position"></param>
@@ -298,7 +314,7 @@ public class GridManager : MonoBehaviour
     {
         GridCell cell = GetCell(position);
 
-        if (cell == null || !cell.IsWalkable)
+        if (!CanCharacterEnter(position))
             return false;
 
         return cell.TrySetCharacter(character);

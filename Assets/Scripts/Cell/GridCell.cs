@@ -22,10 +22,7 @@ public class GridCell
     /// </summary>
     public bool IsReserved { get; private set; }
 
-    public bool IsWalkable =>
-        Block == null &&
-        Character == null &&
-        !IsReserved;
+    public bool IsWalkable => Block == null && Character == null && !IsReserved;
 
     /// <summary>
     /// 指定されたキャラクターをこのセルに設定しようとします。
@@ -68,7 +65,7 @@ public class GridCell
         Character = null;
         return true;
     }
-    
+
     /// <summary>
     /// 指定されたブロックをこのセルから削除しようとします。
     /// </summary>

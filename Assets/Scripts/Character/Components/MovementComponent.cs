@@ -65,7 +65,7 @@ public class MovementComponent : MonoBehaviour
     /// <summary>
     /// Spawnerから必要な参照と開始位置を受け取り、開始セルへCharacterを登録します。
     /// </summary>
-    public void Init(GridManager gridManager, Vector3Int startPosition)
+    public bool Init(GridManager gridManager, Vector3Int startPosition)
     {
         _gridManager = gridManager;
         _currentGridPosition = startPosition;
@@ -76,10 +76,11 @@ public class MovementComponent : MonoBehaviour
         {
             Debug.LogError("キャラクターの初期登録に失敗しました。", this);
             enabled = false;
-            return;
+            return false;
         }
 
         _isInitialized = true;
+        return true;
     }
 
     /// <summary>

@@ -221,7 +221,9 @@ y=0 Block        y=0 Block
 ```text
 GridBomberGameMode
 ├── StageGenerator.GenerateStage()
-└── CharacterSpawner.SpawnPlayer()
+├── CharacterSpawner.SpawnPlayer()
+├── CharacterSpawner.SpawnTestEnemy()
+└── GridBomberGameState.StartMatch()
 
 PlayerController
 ├── Camera基準入力の変換
@@ -275,6 +277,8 @@ GridGravitySystem
 - `Gameplay/Block/Block.cs`
 - `Gameplay/Stage/StageGenerator.cs`
 - `GameModes/GridBomberGameMode.cs`
+- `GameModes/GridBomberGameState.cs`
+- `UI/GameHud.cs`
 - `Gameplay/Bomb/Bomb.cs`
 - `Character/Components/BombComponent.cs`
 
@@ -283,13 +287,10 @@ GridGravitySystem
 - `Gameplay/Explosion/ExplosionSystem.cs`
 - `Gameplay/Item/Item.cs`
 - `Character/Components/InventoryComponent.cs`
-- `Character/Components/LifeComponent.cs`
 - `AI/Behavior/EnemyBrain.cs`
 - `AI/Pathfinding/GridPathfindingSystem.cs`
 - `AI/DangerMap/GridDangerMap.cs`
-- `GameModes/GridBomberGameState.cs`
 - `GameModes/EndPhase/EndPhaseController.cs`
-- `UI/GameHud.cs`
 
 ## 5. Unity Editor設定
 
@@ -311,6 +312,7 @@ PlayerはSceneへ事前配置せず、Play開始後に`CharacterSpawner`が1体�
 
 - Stage Generatorを設定
 - Character Spawnerを設定
+- Game Stateを設定
 
 `StageGenerator`:
 
@@ -318,13 +320,42 @@ PlayerはSceneへ事前配置せず、Play開始後に`CharacterSpawner`が1体�
 - Unbreakable Block Prefabを設定
 - Breakable Block Prefabを設定
 - Player Spawn Position既定値は(1,1,1)
+- Enemy Spawn Position既定値は(5,1,5)
 
 `CharacterSpawner`:
 
 - Grid Managerを設定
 - Player Prefabを設定
+- Test Enemy Prefabを設定
 - Game Cameraを設定
 - Placeable Block Prefabを設定
+
+### Test Enemy Prefab
+
+最低限必要なComponent:
+
+```text
+EnemyCharacter
+MovementComponent
+LifeComponent
+```
+
+AIはまだ不要。Playerと区別できる色やMeshを設定する。
+
+### GameHud
+
+Canvasへ`GameHud`を追加し、以下を設定する:
+
+- Game State: Scene上の`GridBomberGameState`
+- Alive Count Text: 生存人数表示用のTextMeshProUGUI
+- Result Panel: 試合終了時だけ表示するPanel
+- Result Text: YOU WIN / YOU LOSE / DRAW表示用のTextMeshProUGUI
+- Restart Button: Scene再読み込み用Button
+- Result Canvas Group: Result PanelのCanvasGroup（未設定なら実行時に自動追加）
+- Result Delay: 死亡から表示開始までの秒数（既定0.75秒）
+- Fade Duration: 透明から完全表示までの秒数（既定0.5秒）
+
+Restart ButtonのOnClickはコードで購読するため、InspectorのOn Clickへ重ねて登録しない。
 
 ### Player Prefab
 
@@ -431,6 +462,11 @@ Blockを置けない場合、以下をConsoleへ出す実装になっている�
 - 爆風セルを`Center`、`Middle`、`End`、`BlockedEnd`に分類し、6方向へ回転表示
 - Editorメニューから爆風Materialと4種類のParticle Prefabを自動生成可能
 - 落下Blockが通過する各セルをGrid基準で判定し、Characterを押し潰して死亡させる処理
+- Player 1体と棒立ちTest Enemy 1体の生成・Grid登録
+- Waiting / Playing / Finishedの試合状態と死亡時の勝者判定
+- GameHudによる生存人数、YOU WIN / YOU LOSE / DRAWの表示
+- Restart Buttonによる現在Sceneの再読み込み
+- 死亡後にDelayを置き、Result PanelをCanvasGroupでフェードイン表示
 
 ## 9. 既知の課題・注意点
 

@@ -7,11 +7,13 @@ using Random = UnityEngine.Random;
 public class StageGenerator : MonoBehaviour
 {
     public Vector3Int PlayerSpawnPosition => _playerSpawnPosition;
+    public Vector3Int EnemySpawnPosition => _enemySpawnPosition;
 
     [SerializeField] private GridManager _gridManager;
     [SerializeField] private Block _unbreakableBlockPrefab;
     [SerializeField] private Block _breakableBlockPrefab;
     [SerializeField] private Vector3Int _playerSpawnPosition = new Vector3Int(1, 1, 1);
+    [SerializeField] private Vector3Int _enemySpawnPosition = new Vector3Int(5, 1, 5);
     [SerializeField] private float _breakableBlockRate = 0.4f;
 
     [SerializeField] private int _randomSeed = 12345;
@@ -115,7 +117,10 @@ public class StageGenerator : MonoBehaviour
     private bool IsSpawnSafeCell(Vector3Int position)
     {
         return position == _playerSpawnPosition ||
+               position == _enemySpawnPosition ||
                position == _playerSpawnPosition + Vector3Int.right ||
-               position == _playerSpawnPosition + Vector3Int.forward;
+               position == _playerSpawnPosition + Vector3Int.forward ||
+               position == _enemySpawnPosition + Vector3Int.left ||
+               position == _enemySpawnPosition + Vector3Int.back;
     }
 }
