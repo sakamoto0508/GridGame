@@ -35,9 +35,8 @@ public class Bomb : MonoBehaviour
     /// <summary>爆発までの残り秒数です。</summary>
     public float RemainingFuseTime => Mathf.Max(0f, _remainingFuseTime);
 
-    [SerializeField, Min(0f)] private float _fallDurationPerCell = 0.12f;
-
     private GridManager _gridManager;
+    private BombSettings _settings;
     private ExplosionView _explosionView;
     private float _remainingFuseTime;
     private bool _isInitialized;
@@ -70,14 +69,18 @@ public class Bomb : MonoBehaviour
     /// 生成直後のBombへ必要な情報を設定し、Fuseと重力を開始します。
     /// GridCellへの初期登録は呼び出し側が先に済ませます。
     /// </summary>
-    public void Init(GridManager gridManager, Vector3Int gridPosition, CharacterBase owner,
-        float fuseTime, int explosionPower)
+    public void Init(
+        GridManager gridManager,
+        Vector3Int gridPosition,
+        CharacterBase owner,
+        BombSettings settings)
     {
         _gridManager = gridManager;
+        _settings = settings;
         GridPosition = gridPosition;
         Owner = owner;
-        _remainingFuseTime = Mathf.Max(0f, fuseTime);
-        ExplosionPower = Mathf.Max(1, explosionPower);
+        _remainingFuseTime = Mathf.Max(0f, _settings.FuseTime);
+        ExplosionPower = Mathf.Max(1, _settings.ExplosionPower);
         State = BombState.Armed;
         _isInitialized = true;
 
@@ -152,7 +155,7 @@ public class Bomb : MonoBehaviour
     private async Awaitable FallAwaitable(Vector3 destination, int fallDistance)
     {
         State = BombState.Falling;
-        float duration = _fallDurationPerCell * Mathf.Max(1, fallDistance);
+        float duration = _settings.FallDurationPerCell * Mathf.Max(1, fallDistance);
 
         try
         {

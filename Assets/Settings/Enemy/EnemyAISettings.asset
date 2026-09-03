@@ -1,0 +1,32 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8fa5ac843d401114183d550bc6347fbd, type: 3}
+  m_Name: EnemyAISettings
+  m_EditorClassIdentifier: Assembly-CSharp::EnemyAISettings
+  _easy:
+    _actionInterval: 0.9
+    _mistakeChance: 0.35
+    _bombPlaceChance: 0.2
+    _detectionRange: 3
+    _bombDistance: 1
+  _normal:
+    _actionInterval: 0.55
+    _mistakeChance: 0.12
+    _bombPlaceChance: 0.4
+    _detectionRange: 6
+    _bombDistance: 2
+  _hard:
+    _actionInterval: 0.3
+    _mistakeChance: 0
+    _bombPlaceChance: 0.65
+    _detectionRange: 999
+    _bombDistance: 2

@@ -319,11 +319,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9fb36a2dc2045a846845d288a297eabe, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MovementComponent
-  _moveDuration: 0.15
-  _jumpUpDuration: 0.15
-  _airTime: 0.15
-  _fallDuration: 0.15
-  _jumpArcHeight: 0.5
+  _settings: {fileID: 11400000, guid: 76dd9dc37e9805549ac72eedb1bf513d, type: 2}
 --- !u!114 &8618956708731586975
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -360,6 +356,4 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4a73b3f23841a20488cf71c47a2e432b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::BombComponent
-  _maxBombCount: 5
-  _fuseTime: 3
-  _explosionPower: 1
+  _settings: {fileID: 11400000, guid: e9f8247f0bfcf8441a6cedf223851657, type: 2}

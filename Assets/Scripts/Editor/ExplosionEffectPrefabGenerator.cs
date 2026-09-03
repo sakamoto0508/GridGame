@@ -15,6 +15,8 @@ public static class ExplosionEffectPrefabGenerator
     private const string MiddlePath = PrefabFolder + "/ExplosionMiddle.prefab";
     private const string EndPath = PrefabFolder + "/ExplosionEnd.prefab";
     private const string BlockedEndPath = PrefabFolder + "/ExplosionBlockedEnd.prefab";
+    private const string VisualSettingsPath =
+        "Assets/Settings/Effects/ExplosionVisualSettings.asset";
 
     /// <summary>Materialと4種類の爆風Prefabを生成します。</summary>
     [MenuItem("Tools/3D Grid Bomber/Create Explosion Effect Prefabs")]
@@ -41,7 +43,8 @@ public static class ExplosionEffectPrefabGenerator
         AssetDatabase.SaveAssets();
         AssetDatabase.Refresh();
 
-        TryAssignToSelectedBombPrefab();
+        ExplosionVisualSettings visualSettings = CreateOrUpdateVisualSettings();
+        TryAssignToSelectedBombPrefab(visualSettings);
 
         Debug.Log(
             $"Explosion Effect Prefabを生成しました: {PrefabFolder}\n" +
@@ -301,7 +304,8 @@ public static class ExplosionEffectPrefabGenerator
     /// <summary>
     /// ProjectウィンドウでBomb Prefabが選択されていれば、生成PrefabをExplosionViewへ設定します。
     /// </summary>
-    private static void TryAssignToSelectedBombPrefab()
+    private static void TryAssignToSelectedBombPrefab(
+        ExplosionVisualSettings visualSettings)
     {
         GameObject selectedObject = Selection.activeObject as GameObject;
         string selectedPath = AssetDatabase.GetAssetPath(selectedObject);
@@ -327,14 +331,7 @@ public static class ExplosionEffectPrefabGenerator
                 view = bomb.gameObject.AddComponent<ExplosionView>();
 
             SerializedObject serializedView = new SerializedObject(view);
-            serializedView.FindProperty("_centerPrefab").objectReferenceValue =
-                LoadEffectPrefab(CenterPath);
-            serializedView.FindProperty("_middlePrefab").objectReferenceValue =
-                LoadEffectPrefab(MiddlePath);
-            serializedView.FindProperty("_endPrefab").objectReferenceValue =
-                LoadEffectPrefab(EndPath);
-            serializedView.FindProperty("_blockedEndPrefab").objectReferenceValue =
-                LoadEffectPrefab(BlockedEndPath);
+            serializedView.FindProperty("_settings").objectReferenceValue = visualSettings;
             serializedView.ApplyModifiedPropertiesWithoutUndo();
 
             PrefabUtility.SaveAsPrefabAsset(prefabRoot, selectedPath);
@@ -344,6 +341,34 @@ public static class ExplosionEffectPrefabGenerator
         {
             PrefabUtility.UnloadPrefabContents(prefabRoot);
         }
+    }
+
+    /// <summary>生成した4 PrefabをExplosionVisualSettingsへまとめます。</summary>
+    private static ExplosionVisualSettings CreateOrUpdateVisualSettings()
+    {
+        EnsureFolder("Assets/Settings/Effects");
+        ExplosionVisualSettings settings =
+            AssetDatabase.LoadAssetAtPath<ExplosionVisualSettings>(VisualSettingsPath);
+
+        if (settings == null)
+        {
+            settings = ScriptableObject.CreateInstance<ExplosionVisualSettings>();
+            AssetDatabase.CreateAsset(settings, VisualSettingsPath);
+        }
+
+        SerializedObject serializedSettings = new SerializedObject(settings);
+        serializedSettings.FindProperty("_centerPrefab").objectReferenceValue =
+            LoadEffectPrefab(CenterPath);
+        serializedSettings.FindProperty("_middlePrefab").objectReferenceValue =
+            LoadEffectPrefab(MiddlePath);
+        serializedSettings.FindProperty("_endPrefab").objectReferenceValue =
+            LoadEffectPrefab(EndPath);
+        serializedSettings.FindProperty("_blockedEndPrefab").objectReferenceValue =
+            LoadEffectPrefab(BlockedEndPath);
+        serializedSettings.ApplyModifiedPropertiesWithoutUndo();
+        EditorUtility.SetDirty(settings);
+        AssetDatabase.SaveAssets();
+        return settings;
     }
 
     /// <summary>Prefab AssetのルートからExplosionEffect Componentを取得します。</summary>

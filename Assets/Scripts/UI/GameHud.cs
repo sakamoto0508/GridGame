@@ -11,6 +11,7 @@ public class GameHud : MonoBehaviour
 {
     [Header("Game State")]
     [SerializeField] private GridBomberGameState _gameState;
+    [SerializeField] private GameHudSettings _settings;
 
     [Header("Playing UI")]
     [SerializeField] private TMP_Text _aliveCountText;
@@ -21,14 +22,13 @@ public class GameHud : MonoBehaviour
     [SerializeField] private TMP_Text _resultText;
     [SerializeField] private Button _restartButton;
 
-    [Header("Result Animation")]
-    [SerializeField, Min(0f)] private float _resultDelay = 0.75f;
-    [SerializeField, Min(0f)] private float _fadeDuration = 0.5f;
-
     private int _resultSequenceVersion;
 
     private void Awake()
     {
+        if (_settings == null)
+            Debug.LogError("GameHudのGame HUD Settingsが未設定です。", this);
+
         PrepareResultCanvasGroup();
         HideResult();
 
@@ -72,7 +72,9 @@ public class GameHud : MonoBehaviour
     private void UpdateAliveCount(int aliveCount)
     {
         if (_aliveCountText != null)
-            _aliveCountText.text = $"ALIVE: {aliveCount}";
+            _aliveCountText.text = _settings != null
+                ? string.Format(_settings.AliveFormat, aliveCount)
+                : $"ALIVE: {aliveCount}";
     }
 
     /// <summary>新しい試合が始まったとき、前回の結果表示を閉じます。</summary>
@@ -88,11 +90,11 @@ public class GameHud : MonoBehaviour
         if (_resultText != null)
         {
             if (winner == null)
-                _resultText.text = "DRAW";
+                _resultText.text = _settings != null ? _settings.DrawText : "DRAW";
             else if (winner is PlayerCharacter)
-                _resultText.text = "YOU WIN";
+                _resultText.text = _settings != null ? _settings.WinText : "YOU WIN";
             else
-                _resultText.text = "YOU LOSE";
+                _resultText.text = _settings != null ? _settings.LoseText : "YOU LOSE";
         }
 
         int sequenceVersion = ++_resultSequenceVersion;
@@ -104,7 +106,10 @@ public class GameHud : MonoBehaviour
     {
         float elapsedTime = 0f;
 
-        while (elapsedTime < _resultDelay)
+        float resultDelay = _settings != null ? _settings.ResultDelay : 0f;
+        float fadeDuration = _settings != null ? _settings.FadeDuration : 0f;
+
+        while (elapsedTime < resultDelay)
         {
             // 試合終了時にTimeScaleを止めても結果UIを表示できるようにします。
             elapsedTime += Time.unscaledDeltaTime;
@@ -126,7 +131,7 @@ public class GameHud : MonoBehaviour
         _resultCanvasGroup.interactable = false;
         _resultCanvasGroup.blocksRaycasts = false;
 
-        if (_fadeDuration <= 0f)
+        if (fadeDuration <= 0f)
         {
             CompleteResultFade();
             return;
@@ -134,10 +139,10 @@ public class GameHud : MonoBehaviour
 
         elapsedTime = 0f;
 
-        while (elapsedTime < _fadeDuration)
+        while (elapsedTime < fadeDuration)
         {
             elapsedTime += Time.unscaledDeltaTime;
-            _resultCanvasGroup.alpha = Mathf.Clamp01(elapsedTime / _fadeDuration);
+            _resultCanvasGroup.alpha = Mathf.Clamp01(elapsedTime / fadeDuration);
             await Awaitable.NextFrameAsync();
 
             if (!CanContinueResultSequence(sequenceVersion))

@@ -1,0 +1,19 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9f3515d42c7bac54b97326ee8352ae4e, type: 3}
+  m_Name: ExplosionVisualSettings
+  m_EditorClassIdentifier: Assembly-CSharp::ExplosionVisualSettings
+  _centerPrefab: {fileID: 8482292165910165399, guid: 6ef2efc0177b59f40a684b110072599e, type: 3}
+  _middlePrefab: {fileID: 7668013735683936945, guid: 6e1e098ee3c5d1f419e40a57b0903554, type: 3}
+  _endPrefab: {fileID: 1543558058330922319, guid: fa7a44c8d65880f4da0a8ab82cb021b6, type: 3}
+  _blockedEndPrefab: {fileID: 8294232777165737635, guid: d67dca97fe1dba54182705c3f28a1271, type: 3}
+  _effectDuration: 0.35

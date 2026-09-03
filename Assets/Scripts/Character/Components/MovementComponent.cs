@@ -32,14 +32,7 @@ public class MovementComponent : MonoBehaviour
     /// <summary>新しい移動要求を受け付けられない状態ならtrueです。</summary>
     public bool IsBusy => _state != CharacterMoveState.Grounded;
 
-    [Header("Move")]
-    [SerializeField, Min(0f)] private float _moveDuration = 0.15f;
-
-    [Header("Jump")]
-    [SerializeField, Min(0f)] private float _jumpUpDuration = 0.15f;
-    [SerializeField, Min(0f)] private float _airTime = 0.15f;
-    [SerializeField, Min(0f)] private float _fallDuration = 0.15f;
-    [SerializeField, Min(0f)] private float _jumpArcHeight = 0.5f;
+    [SerializeField] private CharacterMovementSettings _settings;
 
     private GridManager _gridManager;
     private CharacterBase _character;
@@ -67,6 +60,13 @@ public class MovementComponent : MonoBehaviour
     /// </summary>
     public bool Init(GridManager gridManager, Vector3Int startPosition)
     {
+        if (_settings == null)
+        {
+            Debug.LogError("MovementComponentのCharacter Movement Settingsが未設定です。", this);
+            enabled = false;
+            return false;
+        }
+
         _gridManager = gridManager;
         _currentGridPosition = startPosition;
         transform.position = _gridManager.GetWorldPosition(startPosition);
@@ -190,7 +190,7 @@ public class MovementComponent : MonoBehaviour
 
         try
         {
-            await MoveToAwaitable(destination, _moveDuration);
+            await MoveToAwaitable(destination, _settings.MoveDuration);
         }
         finally
         {
@@ -211,8 +211,8 @@ public class MovementComponent : MonoBehaviour
         try
         {
             Vector3 airWorldPosition = _gridManager.GetWorldPosition(airPosition);
-            await MoveToAwaitable(airWorldPosition, _jumpUpDuration);
-            await WaitAwaitable(_airTime);
+            await MoveToAwaitable(airWorldPosition, _settings.JumpUpDuration);
+            await WaitAwaitable(_settings.AirTime);
 
             // 元のセルへBlockが置かれた場合、現在セルがそのBlock上の着地点になります。
             if (_gridManager.HasBlock(groundPosition))
@@ -229,7 +229,7 @@ public class MovementComponent : MonoBehaviour
 
             _currentGridPosition = groundPosition;
             await MoveToAwaitable(
-                _gridManager.GetWorldPosition(groundPosition), _fallDuration);
+                _gridManager.GetWorldPosition(groundPosition), _settings.FallDuration);
         }
         finally
         {
@@ -244,7 +244,7 @@ public class MovementComponent : MonoBehaviour
 
         try
         {
-            float duration = _jumpUpDuration + _fallDuration;
+            float duration = _settings.JumpUpDuration + _settings.FallDuration;
 
             if (duration <= 0f)
             {
@@ -262,7 +262,7 @@ public class MovementComponent : MonoBehaviour
                 Vector3 position = Vector3.Lerp(start, destination, rate);
 
                 // 0→1→0と変化する値を加え、直線移動をジャンプ軌道にします。
-                position.y += 4f * rate * (1f - rate) * _jumpArcHeight;
+                position.y += 4f * rate * (1f - rate) * _settings.JumpArcHeight;
                 transform.position = position;
                 await Awaitable.NextFrameAsync();
             }
@@ -321,7 +321,7 @@ public class MovementComponent : MonoBehaviour
 
         try
         {
-            float duration = _fallDuration * Mathf.Max(1, fallDistance);
+            float duration = _settings.FallDuration * Mathf.Max(1, fallDistance);
             await MoveToAwaitable(destination, duration);
         }
         finally

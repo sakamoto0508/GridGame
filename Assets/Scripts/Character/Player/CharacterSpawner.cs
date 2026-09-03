@@ -4,16 +4,13 @@ using UnityEngine;
 public class CharacterSpawner : MonoBehaviour
 {
     [SerializeField] private GridManager _gridManager;
-    [SerializeField] private PlayerCharacter _playerPrefab;
-    [SerializeField] private EnemyCharacter _testEnemyPrefab;
+    [SerializeField] private CharacterPrefabSettings _settings;
     [SerializeField] private Camera _gameCamera;
-    [SerializeField] private Block _placeableBlockPrefab;
-    [SerializeField] private Bomb _bombPrefab;
 
     /// <summary>指定座標へPlayerを生成し、必要なScene参照を注入します。</summary>
     public PlayerCharacter SpawnPlayer(Vector3Int gridPosition)
     {
-        if (_gridManager == null || _playerPrefab == null)
+        if (_gridManager == null || _settings == null || _settings.PlayerPrefab == null)
         {
             Debug.LogError("Playerを生成できません: GridManagerまたはPlayer Prefabが未設定です。", this);
             return null;
@@ -21,7 +18,7 @@ public class CharacterSpawner : MonoBehaviour
 
         Vector3 worldPosition = _gridManager.GetWorldPosition(gridPosition);
 
-        PlayerCharacter player = Instantiate(_playerPrefab, worldPosition, Quaternion.identity);
+        PlayerCharacter player = Instantiate(_settings.PlayerPrefab, worldPosition, Quaternion.identity);
         MovementComponent movement = player.GetComponent<MovementComponent>();
         PlayerController controller=player.GetComponent<PlayerController>();
         BlockPlacementComponent blockPlacement = player.GetComponent<BlockPlacementComponent>();
@@ -45,7 +42,7 @@ public class CharacterSpawner : MonoBehaviour
         }
         else
         {
-            blockPlacement.Init(_gridManager, _placeableBlockPrefab);
+            blockPlacement.Init(_gridManager, _settings.PlaceableBlockPrefab);
         }
 
         if (bombComponent == null)
@@ -56,19 +53,22 @@ public class CharacterSpawner : MonoBehaviour
         }
         else
         {
-            bombComponent.Init(_gridManager, _bombPrefab);
+            bombComponent.Init(_gridManager, _settings.BombPrefab);
         }
 
         return player;
     }
 
     /// <summary>
-    /// AIをまだ持たない動作確認用Enemyを生成し、開始セルへ登録します。
-    /// MovementComponentとLifeComponentはPlayerと同じ共通実装を使用します。
+    /// Enemyを生成して共通Componentと簡易AIを初期化します。
     /// </summary>
-    public EnemyCharacter SpawnTestEnemy(Vector3Int gridPosition)
+    public EnemyCharacter SpawnTestEnemy(
+        Vector3Int gridPosition,
+        CharacterBase player,
+        EnemyDifficulty difficulty,
+        EnemyAISettings enemyAISettings)
     {
-        if (_gridManager == null || _testEnemyPrefab == null)
+        if (_gridManager == null || _settings == null || _settings.EnemyPrefab == null)
         {
             Debug.LogError(
                 "Test Enemyを生成できません: GridManagerまたはTest Enemy Prefabが未設定です。",
@@ -77,10 +77,12 @@ public class CharacterSpawner : MonoBehaviour
         }
 
         EnemyCharacter enemy = Instantiate(
-            _testEnemyPrefab,
+            _settings.EnemyPrefab,
             _gridManager.GetWorldPosition(gridPosition),
             Quaternion.identity);
         MovementComponent movement = enemy.GetComponent<MovementComponent>();
+        BombComponent bombComponent = enemy.GetComponent<BombComponent>();
+        EnemyBrain enemyBrain = enemy.GetComponent<EnemyBrain>();
 
         if (movement == null || !movement.Init(_gridManager, gridPosition))
         {
@@ -89,7 +91,28 @@ public class CharacterSpawner : MonoBehaviour
             return null;
         }
 
-        Debug.Log($"Test Enemyを生成しました: Cell={gridPosition}", enemy);
+        if (bombComponent == null || enemyBrain == null)
+        {
+            Debug.LogError(
+                "Test EnemyにBombComponentまたはEnemyBrainがありません。Enemy Prefabを確認してください。",
+                enemy);
+            movement.UnregisterFromGrid();
+            Destroy(enemy.gameObject);
+            return null;
+        }
+
+        bombComponent.Init(_gridManager, _settings.BombPrefab);
+
+        if (!enemyBrain.Init(_gridManager, player, difficulty, enemyAISettings))
+        {
+            movement.UnregisterFromGrid();
+            Destroy(enemy.gameObject);
+            return null;
+        }
+
+        Debug.Log(
+            $"Test Enemyを生成しました: Cell={gridPosition}, Difficulty={difficulty}",
+            enemy);
         return enemy;
     }
 }

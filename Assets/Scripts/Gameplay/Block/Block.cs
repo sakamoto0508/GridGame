@@ -14,18 +14,24 @@ public enum BlockType
 /// </summary>
 public class Block : MonoBehaviour
 {
-    [SerializeField] private BlockType _blockType;
-    [SerializeField] private float _fallDuration = 0.5f;
+    [SerializeField] private BlockSettings _settings;
     private GridManager _gridManager;
     private bool _isFalling;
     private bool _isDestroyed;
 
-    public BlockType Type => _blockType;
+    public BlockType Type => _settings != null ? _settings.Type : BlockType.Unbreakable;
     public Vector3Int GridPosition { get; private set; }
 
     /// <summary>生成されたBlockへ論理グリッド座標を設定します。</summary>
     public void Initialize(GridManager gridManager, Vector3Int gridPosition)
     {
+        if (_settings == null)
+        {
+            Debug.LogError("BlockのBlock Settingsが未設定です。", this);
+            enabled = false;
+            return;
+        }
+
         _gridManager = gridManager;
         GridPosition = gridPosition;
 
@@ -38,7 +44,7 @@ public class Block : MonoBehaviour
     /// </summary>
     public bool BlockBreak()
     {
-        if (_isDestroyed || _blockType != BlockType.Breakable || _gridManager == null)
+        if (_isDestroyed || Type != BlockType.Breakable || _gridManager == null)
             return false;
 
         Vector3Int destroyedPosition = GridPosition;
@@ -107,10 +113,12 @@ public class Block : MonoBehaviour
         Vector3 startWorldPosition = transform.position;
         int nextGridYToCheck = startGridPosition.y - 1;
 
-        while (!_isDestroyed && elapsedTime < _fallDuration)
+        while (!_isDestroyed && elapsedTime < _settings.FallDuration)
         {
             elapsedTime += Time.deltaTime;
-            float t = Mathf.Clamp01(elapsedTime / _fallDuration);
+            float t = _settings.FallDuration <= 0f
+                ? 1f
+                : Mathf.Clamp01(elapsedTime / _settings.FallDuration);
             transform.position = Vector3.Lerp(startWorldPosition, targetWorldPosition, t);
 
             // 補間位置が次のセル高さを越えたら、そのセルのCharacterを判定します。

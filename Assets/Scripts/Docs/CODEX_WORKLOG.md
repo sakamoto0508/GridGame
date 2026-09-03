@@ -223,13 +223,21 @@ GridBomberGameMode
 ├── StageGenerator.GenerateStage()
 ├── CharacterSpawner.SpawnPlayer()
 ├── CharacterSpawner.SpawnTestEnemy()
-└── GridBomberGameState.StartMatch()
+├── GridBomberGameState.StartMatch()
+└── Enemy Difficulty選択（Easy / Normal / Hard）
 
 PlayerController
 ├── Camera基準入力の変換
 ├── MovementComponentへ移動・ジャンプ要求
 ├── BlockPlacementComponentへ配置要求
 └── BombComponentへ設置要求
+
+EnemyBrain
+├── 難易度別の行動間隔・判断ミス・Bomb確率・検知距離
+├── Player検知外ではランダム徘徊
+├── Player検知中は距離が縮む方向を優先
+├── 近距離でBomb設置
+└── 全方向が塞がれた場合にBomb設置を試行
 
 MovementComponent
 ├── 通常移動
@@ -281,13 +289,14 @@ GridGravitySystem
 - `UI/GameHud.cs`
 - `Gameplay/Bomb/Bomb.cs`
 - `Character/Components/BombComponent.cs`
+- `AI/Behavior/EnemyBrain.cs`
+- `AI/Behavior/EnemyDifficulty.cs`
 
 ### 現在ほぼ空の土台
 
 - `Gameplay/Explosion/ExplosionSystem.cs`
 - `Gameplay/Item/Item.cs`
 - `Character/Components/InventoryComponent.cs`
-- `AI/Behavior/EnemyBrain.cs`
 - `AI/Pathfinding/GridPathfindingSystem.cs`
 - `AI/DangerMap/GridDangerMap.cs`
 - `GameModes/EndPhase/EndPhaseController.cs`
@@ -313,6 +322,7 @@ PlayerはSceneへ事前配置せず、Play開始後に`CharacterSpawner`が1体�
 - Stage Generatorを設定
 - Character Spawnerを設定
 - Game Stateを設定
+- Enemy DifficultyをEasy / Normal / Hardから選択
 
 `StageGenerator`:
 
@@ -338,9 +348,11 @@ PlayerはSceneへ事前配置せず、Play開始後に`CharacterSpawner`が1体�
 EnemyCharacter
 MovementComponent
 LifeComponent
+BombComponent
+EnemyBrain
 ```
 
-AIはまだ不要。Playerと区別できる色やMeshを設定する。
+Playerと区別できる色やMeshを設定する。BombComponentとEnemyBrainは同じ共通Movementを使用する。
 
 ### GameHud
 
@@ -467,6 +479,7 @@ Blockを置けない場合、以下をConsoleへ出す実装になっている�
 - GameHudによる生存人数、YOU WIN / YOU LOSE / DRAWの表示
 - Restart Buttonによる現在Sceneの再読み込み
 - 死亡後にDelayを置き、Result PanelをCanvasGroupでフェードイン表示
+- Easy / Normal / Hardを選択可能な簡易Enemy AI
 
 ## 9. 既知の課題・注意点
 
@@ -509,16 +522,17 @@ Explosion EffectのEditor設定:
 1. ProjectウィンドウでBomb Prefabを選択する
 2. `Tools > 3D Grid Bomber > Create Explosion Effect Prefabs`を実行する
 3. `Assets/Prefabs/Effects/Explosion`と`Assets/Materials/Effects/Explosion`を確認する
-4. Bomb Prefabを選択して実行した場合、4種類の参照も自動設定される
+4. `ExplosionVisualSettings.asset`へ4種類のPrefabが登録される
+5. Bomb Prefabを選択して実行した場合、ExplosionViewへSettings Assetも自動設定される
 
 1. Center、Middle、End、必要ならBlockedEndの見た目用Prefabを作る
 2. 各Prefabへ`ExplosionEffect`を追加する
 3. Middle、End、BlockedEndはローカルZ+方向へ伸びる向きで作る
 4. 判定はGrid側で完了しているため、死亡判定用Colliderは追加しない
 5. Bomb Prefabへ`ExplosionView`を追加する
-6. `Center Prefab`、`Middle Prefab`、`End Prefab`へ各Prefabを設定する
-7. `Blocked End Prefab`は任意。未設定の場合はEnd Prefabを使用する
-8. `Effect Duration`で表示秒数を調整する
+6. `ExplosionVisualSettings`へCenter、Middle、End、BlockedEnd Prefabを設定する
+7. BlockedEnd Prefabは任意。未設定の場合はEnd Prefabを使用する
+8. `ExplosionVisualSettings.Effect Duration`で表示秒数を調整する
 
 最初のBomb完成条件:
 
@@ -542,10 +556,57 @@ Player移動                       完了
 Character重力                    完了
 Block配置・重力                  基礎完了
 Bomb配置・重力・Fuse             コード実装済み／Editor確認待ち
-6方向Explosion                   次
-Block破壊・Character死亡         未実装
+6方向Explosion                   完了
+Block破壊・Character死亡         完了
 Item落下・取得                   未実装
-Enemy AI・Danger Map             未実装
+Enemy AI                         基礎完了
+Danger Map・経路探索             未実装
 終盤Block落下                    未実装
-勝敗・UI・演出・Sound            未実装
+勝敗・UI・爆風演出               基礎完了
+Sound                            未実装
 ```
+
+## 12. ScriptableObject設定
+
+ゲーム調整値とPrefab参照はジャンル別Settings Assetへ移行済み。
+Scene Object参照（GridManager、Camera、GameState、UI Object等）はScene側で設定する。
+
+```text
+Assets/Settings
+├── Grid/GridSettings
+├── Character/CharacterMovementSettings
+├── Character/CharacterPrefabSettings
+├── Bomb/BombSettings
+├── Block/BreakableBlockSettings
+├── Block/UnbreakableBlockSettings
+├── Stage/StageSettings
+├── Enemy/EnemyAISettings
+├── Effects/ExplosionVisualSettings
+├── UI/GameHudSettings
+└── GameConfig
+```
+
+生成手順:
+
+1. Unityの`Tools > 3D Grid Bomber > Create Default Settings Assets`を実行
+2. 各Assetの値とPrefab参照を設定
+3. SceneとPrefabの各Componentへ対応Assetを割り当てる
+
+割り当て先:
+
+- GridManager → GridSettings
+- StageGenerator → StageSettings
+- CharacterSpawner → CharacterPrefabSettings
+- Player/EnemyのMovementComponent → CharacterMovementSettings
+- Player/EnemyのBombComponent → BombSettings
+- Breakable/Unbreakable/配置用Block → 対応するBlockSettings
+- GridBomberGameMode → EnemyAISettings
+- BombのExplosionView → ExplosionVisualSettings
+- GameHud → GameHudSettings
+
+既存Componentの数値・Prefab欄はSO参照へ置き換わるため、移行直後は必ず上記を再設定する。
+
+検証:
+
+- `Assembly-CSharp.csproj`: build成功、警告0、エラー0
+- `Assembly-CSharp-Editor.csproj`: build成功、警告0、エラー0

@@ -20,10 +20,8 @@ public static class ExplosionSystem
     };
 
     /// <summary>爆風の座標・方向・表示区分を計算します。起点はCenterとして含まれます。</summary>
-    public static IReadOnlyList<ExplosionCellData> CalculateExplosionCells(
-        GridManager gridManager,
-        Vector3Int origin,
-        int explosionPower)
+    public static IReadOnlyList<ExplosionCellData> CalculateExplosionCells(GridManager gridManager,Vector3Int origin
+                                                                            ,int explosionPower)
     {
         List<ExplosionCellData> explosionCells = new List<ExplosionCellData>();
 
@@ -53,10 +51,8 @@ public static class ExplosionSystem
     }
 
     /// <summary>座標だけが必要な既存処理やテスト向けの互換APIです。</summary>
-    public static IReadOnlyList<Vector3Int> CalculateAffectedCells(
-        GridManager gridManager,
-        Vector3Int origin,
-        int explosionPower)
+    public static IReadOnlyList<Vector3Int> CalculateAffectedCells(GridManager gridManager,Vector3Int origin,
+                                                                    int explosionPower)
     {
         IReadOnlyList<ExplosionCellData> explosionCells =
             CalculateExplosionCells(gridManager, origin, explosionPower);
@@ -69,10 +65,8 @@ public static class ExplosionSystem
     }
 
     /// <summary>爆風を計算して盤面へ効果を適用し、表示用データを返します。</summary>
-    public static IReadOnlyList<ExplosionCellData> GenerateExplosion(
-        GridManager gridManager,
-        Vector3Int origin,
-        int explosionPower)
+    public static IReadOnlyList<ExplosionCellData> GenerateExplosion( GridManager gridManager,Vector3Int origin
+                                                                        ,int explosionPower)
     {
         IReadOnlyList<ExplosionCellData> explosionCells =
             CalculateExplosionCells(gridManager, origin, explosionPower);
@@ -86,9 +80,7 @@ public static class ExplosionSystem
     /// 計算済みの爆風セルへゲーム上の効果を適用します。
     /// 盤面走査中の変更を避けるため、連鎖対象Bombは先に収集して最後に爆発させます。
     /// </summary>
-    private static void ApplyExplosionEffects(
-        GridManager gridManager,
-        IReadOnlyList<ExplosionCellData> explosionCells)
+    private static void ApplyExplosionEffects(GridManager gridManager,IReadOnlyList<ExplosionCellData> explosionCells)
     {
         if (gridManager == null)
             return;
@@ -120,12 +112,8 @@ public static class ExplosionSystem
     }
 
     /// <summary>1方向を射程まで走査し、Blockまたはグリッド端で停止します。</summary>
-    private static void AddCellsInDirection(
-        GridManager gridManager,
-        Vector3Int origin,
-        Vector3Int direction,
-        int range,
-        List<ExplosionCellData> explosionCells)
+    private static void AddCellsInDirection(GridManager gridManager,Vector3Int origin,Vector3Int direction
+                                                ,int range,List<ExplosionCellData> explosionCells)
     {
         int firstCellIndex = explosionCells.Count;
 
@@ -168,9 +156,7 @@ public static class ExplosionSystem
     /// 破壊不能Blockまたはグリッド端の直前まで届いた爆風をBlockedEndへ変更します。
     /// 障害物が起点に隣接する場合は方向セルがないため何も変更しません。
     /// </summary>
-    private static void MarkLastDirectionCellBlocked(
-        List<ExplosionCellData> explosionCells,
-        int firstCellIndex)
+    private static void MarkLastDirectionCellBlocked( List<ExplosionCellData> explosionCells,int firstCellIndex)
     {
         if (explosionCells.Count <= firstCellIndex)
             return;
@@ -184,10 +170,7 @@ public static class ExplosionSystem
     }
 
     /// <summary>セル座標と表示区分をConsoleへ出力します。</summary>
-    private static void LogExplosion(
-        Vector3Int origin,
-        int explosionPower,
-        IReadOnlyList<ExplosionCellData> explosionCells)
+    private static void LogExplosion(Vector3Int origin,int explosionPower,IReadOnlyList<ExplosionCellData> explosionCells)
     {
         StringBuilder message = new StringBuilder();
         message.Append($"Explosion cells: Origin={origin}, Power={explosionPower}, Cells=");

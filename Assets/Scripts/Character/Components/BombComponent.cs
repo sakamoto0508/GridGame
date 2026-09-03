@@ -11,11 +11,9 @@ public class BombComponent : MonoBehaviour
     public int CurrentBombCount => _currentBombCount;
 
     /// <summary>同時に設置できる最大Bomb数です。</summary>
-    public int MaxBombCount => _maxBombCount;
+    public int MaxBombCount => _settings != null ? _settings.MaxBombCount : 0;
 
-    [SerializeField, Min(1)] private int _maxBombCount = 1;
-    [SerializeField, Min(0f)] private float _fuseTime = 3f;
-    [SerializeField, Min(1)] private int _explosionPower = 1;
+    [SerializeField] private BombSettings _settings;
 
     private GridManager _gridManager;
     private MovementComponent _movement;
@@ -40,21 +38,25 @@ public class BombComponent : MonoBehaviour
 
         if (_bombPrefab == null)
             Debug.LogError("BombComponentの初期化に失敗しました: Bomb Prefabが未設定です。", this);
+
+        if (_settings == null)
+            Debug.LogError("BombComponentのBomb Settingsが未設定です。", this);
     }
 
     /// <summary>Characterが現在占有しているセルへのBomb設置を試みます。</summary>
     public bool TryPlaceBomb()
     {
-        if (_gridManager == null || _movement == null || _owner == null || _bombPrefab == null)
+        if (_gridManager == null || _movement == null || _owner == null ||
+            _bombPrefab == null || _settings == null)
         {
             Debug.LogWarning("Bombを設置できません: BombComponentの参照が不足しています。", this);
             return false;
         }
 
-        if (_currentBombCount >= _maxBombCount)
+        if (_currentBombCount >= _settings.MaxBombCount)
         {
             Debug.LogWarning(
-                $"Bombを設置できません: 最大同時設置数 {_maxBombCount} に達しています。",
+                $"Bombを設置できません: 最大同時設置数 {_settings.MaxBombCount} に達しています。",
                 this);
             return false;
         }
@@ -81,7 +83,7 @@ public class BombComponent : MonoBehaviour
 
         _currentBombCount++;
         bomb.Exploded += HandleBombExploded;
-        bomb.Init(_gridManager, position, _owner, _fuseTime, _explosionPower);
+        bomb.Init(_gridManager, position, _owner, _settings);
         return true;
     }
 

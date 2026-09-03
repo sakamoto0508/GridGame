@@ -7,19 +7,10 @@ using UnityEngine;
 /// </summary>
 public class ExplosionView : MonoBehaviour
 {
-    [Header("Explosion Effect Prefabs")]
-    [SerializeField] private ExplosionEffect _centerPrefab;
-    [SerializeField] private ExplosionEffect _middlePrefab;
-    [SerializeField] private ExplosionEffect _endPrefab;
-    [SerializeField] private ExplosionEffect _blockedEndPrefab;
-
-    [Tooltip("Middle/End PrefabはローカルZ+方向へ伸びる向きで作成してください。")]
-    [SerializeField, Min(0f)] private float _effectDuration = 0.35f;
+    [SerializeField] private ExplosionVisualSettings _settings;
 
     /// <summary>指定された全セルへ、区分と方向に対応した爆風Effectを生成します。</summary>
-    public bool Show(
-        GridManager gridManager,
-        IReadOnlyList<ExplosionCellData> explosionCells)
+    public bool Show(GridManager gridManager,IReadOnlyList<ExplosionCellData> explosionCells)
     {
         if (gridManager == null)
         {
@@ -27,7 +18,10 @@ public class ExplosionView : MonoBehaviour
             return false;
         }
 
-        if (_centerPrefab == null || _middlePrefab == null || _endPrefab == null)
+        if (_settings == null ||
+            _settings.CenterPrefab == null ||
+            _settings.MiddlePrefab == null ||
+            _settings.EndPrefab == null)
         {
             Debug.LogWarning(
                 "爆風を表示できません: Center、Middle、End Prefabのいずれかが未設定です。",
@@ -47,7 +41,7 @@ public class ExplosionView : MonoBehaviour
 
             // Bombの子にするとBomb破棄時に一緒に消えるため、親を設定せず生成します。
             ExplosionEffect effect = Instantiate(prefab, worldPosition, rotation);
-            effect.Play(_effectDuration);
+            effect.Play(_settings.EffectDuration);
         }
 
         return true;
@@ -59,14 +53,16 @@ public class ExplosionView : MonoBehaviour
         switch (type)
         {
             case ExplosionCellType.Center:
-                return _centerPrefab;
+                return _settings.CenterPrefab;
             case ExplosionCellType.Middle:
-                return _middlePrefab;
+                return _settings.MiddlePrefab;
             case ExplosionCellType.BlockedEnd:
                 // BlockedEndが未設定なら通常のEndを代用します。
-                return _blockedEndPrefab != null ? _blockedEndPrefab : _endPrefab;
+                return _settings.BlockedEndPrefab != null
+                    ? _settings.BlockedEndPrefab
+                    : _settings.EndPrefab;
             default:
-                return _endPrefab;
+                return _settings.EndPrefab;
         }
     }
 

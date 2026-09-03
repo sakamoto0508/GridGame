@@ -1,0 +1,23 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f7e8f4477ca421c4fb1485e3555564e9, type: 3}
+  m_Name: StageSettings
+  m_EditorClassIdentifier: Assembly-CSharp::StageSettings
+  _unbreakableBlockPrefab: {fileID: 1599753650031697247, guid: 1a45a7693cc40a44c9525c826b4eed3c, type: 3}
+  _breakableBlockPrefab: {fileID: 1599753650031697247, guid: 44a21dc743035fe4393d59aba124f04a, type: 3}
+  _playerSpawnPosition: {x: 1, y: 1, z: 1}
+  _enemySpawnPosition: {x: 5, y: 1, z: 5}
+  _breakableBlockRate: 0.4
+  _randomSeed: 12345
+  _floorY: 0
+  _wallY: 1
+  _breakableBlockY: 1

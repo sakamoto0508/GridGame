@@ -1,0 +1,22 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ecbd16137fea19b4aae2f86ecfbc796a, type: 3}
+  m_Name: GameConfig
+  m_EditorClassIdentifier: Assembly-CSharp::GameConfig
+  _grid: {fileID: 11400000, guid: d1d31b2c95e87134f86cb147ce39dc2d, type: 2}
+  _characterMovement: {fileID: 11400000, guid: 76dd9dc37e9805549ac72eedb1bf513d, type: 2}
+  _characterPrefabs: {fileID: 11400000, guid: 7625d3a0f96a80d41a7cea25050a4220, type: 2}
+  _bomb: {fileID: 11400000, guid: e9f8247f0bfcf8441a6cedf223851657, type: 2}
+  _stage: {fileID: 11400000, guid: dbe034cd97b3cd34aa5ddec1cd6350b3, type: 2}
+  _enemyAI: {fileID: 11400000, guid: bae13266d66760848ad718861d48ef5f, type: 2}
+  _explosionVisual: {fileID: 11400000, guid: 02d0b4616a55c344e93aec4da2b9e1d2, type: 2}
+  _gameHud: {fileID: 11400000, guid: fc9ca1b1257cccf459840bd440287d70, type: 2}

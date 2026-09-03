@@ -11,30 +11,36 @@ using UnityEngine;
 /// </summary>
 public class GridManager : MonoBehaviour
 {
-    public Vector3Int Size => new Vector3Int(_sizeX, _sizeY, _sizeZ);
-    [SerializeField] private int _sizeX = 7;
-    [SerializeField] private int _sizeY = 7;
-    [SerializeField] private int _sizeZ = 7;
-    [SerializeField] private float _cellSize = 1.0f;
+    public Vector3Int Size => _settings != null ? _settings.Size : Vector3Int.zero;
+
+    [SerializeField] private GridSettings _settings;
 
     private GridCell[][][] _cells;
 
     private void Awake()
     {
+        if (_settings == null)
+        {
+            Debug.LogError("GridManagerのGrid Settingsが未設定です。", this);
+            enabled = false;
+            return;
+        }
+
         InitializeGrid();
     }
 
     /// <summary>設定されたサイズの全セルを論理グリッドとして初期化します。</summary>
     private void InitializeGrid()
     {
-        _cells = new GridCell[_sizeX][][];
-        for (int x = 0; x < _sizeX; x++)
+        Vector3Int size = _settings.Size;
+        _cells = new GridCell[size.x][][];
+        for (int x = 0; x < size.x; x++)
         {
-            _cells[x] = new GridCell[_sizeY][];
-            for (int y = 0; y < _sizeY; y++)
+            _cells[x] = new GridCell[size.y][];
+            for (int y = 0; y < size.y; y++)
             {
-                _cells[x][y] = new GridCell[_sizeZ];
-                for (int z = 0; z < _sizeZ; z++)
+                _cells[x][y] = new GridCell[size.z];
+                for (int z = 0; z < size.z; z++)
                 {
                     // グリッド座標を計算し、GridCellを生成して格納する
                     // グリッド座標はスタート位置を考慮して計算する
@@ -63,7 +69,7 @@ public class GridManager : MonoBehaviour
     /// <param name="position"></param>
     /// <returns></returns>
     public bool Contains(Vector3Int position)
-    => GridUtility.IsInside(position, new Vector3Int(_sizeX, _sizeY, _sizeZ));
+        => _settings != null && GridUtility.IsInside(position, _settings.Size);
 
     /// <summary>
     /// 指定されたグリッド座標をワールド座標に変換する。
@@ -71,7 +77,7 @@ public class GridManager : MonoBehaviour
     /// <param name="position"></param>
     /// <returns></returns>
     public Vector3 GetWorldPosition(Vector3Int position)
-        => GridUtility.GridToWorld(position, _cellSize, transform.position);
+        => GridUtility.GridToWorld(position, _settings.CellSize, transform.position);
 
     /// <summary>
     /// 指定されたワールド座標をグリッド座標に変換する。
@@ -79,7 +85,7 @@ public class GridManager : MonoBehaviour
     /// <param name="worldPosition"></param>
     /// <returns></returns>
     public Vector3Int GetGridPosition(Vector3 worldPosition)
-        => GridUtility.WorldToGrid(worldPosition, _cellSize, transform.position);
+        => GridUtility.WorldToGrid(worldPosition, _settings.CellSize, transform.position);
 
     /// <summary>
     /// 指定されたグリッド座標にキャラクターが入れるかどうかを判定する。

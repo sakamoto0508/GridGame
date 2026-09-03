@@ -6,7 +6,11 @@ public class GridBomberGameMode : MonoBehaviour
     [SerializeField] private CharacterSpawner _characterSpawner;
     [SerializeField] private GridBomberGameState _gameState;
 
-    /// <summary>ステージ生成後にPlayerと棒立ちEnemyを生成し、試合へ登録します。</summary>
+    [Header("Enemy AI")]
+    [SerializeField] private EnemyDifficulty _enemyDifficulty = EnemyDifficulty.Normal;
+    [SerializeField] private EnemyAISettings _enemyAISettings;
+
+    /// <summary>ステージ生成後にPlayerと簡易AI Enemyを生成し、試合へ登録します。</summary>
     private void Start()
     {
         if (_stageGenerator == null || _characterSpawner == null || _gameState == null)
@@ -22,7 +26,11 @@ public class GridBomberGameMode : MonoBehaviour
         PlayerCharacter player =
             _characterSpawner.SpawnPlayer(_stageGenerator.PlayerSpawnPosition);
         EnemyCharacter testEnemy =
-            _characterSpawner.SpawnTestEnemy(_stageGenerator.EnemySpawnPosition);
+            _characterSpawner.SpawnTestEnemy(
+                _stageGenerator.EnemySpawnPosition,
+                player,
+                _enemyDifficulty,
+                _enemyAISettings);
 
         if (player == null || testEnemy == null)
         {

@@ -6,22 +6,22 @@ using Random = UnityEngine.Random;
 /// </summary>
 public class StageGenerator : MonoBehaviour
 {
-    public Vector3Int PlayerSpawnPosition => _playerSpawnPosition;
-    public Vector3Int EnemySpawnPosition => _enemySpawnPosition;
+    public Vector3Int PlayerSpawnPosition => _settings.PlayerSpawnPosition;
+    public Vector3Int EnemySpawnPosition => _settings.EnemySpawnPosition;
 
     [SerializeField] private GridManager _gridManager;
-    [SerializeField] private Block _unbreakableBlockPrefab;
-    [SerializeField] private Block _breakableBlockPrefab;
-    [SerializeField] private Vector3Int _playerSpawnPosition = new Vector3Int(1, 1, 1);
-    [SerializeField] private Vector3Int _enemySpawnPosition = new Vector3Int(5, 1, 5);
-    [SerializeField] private float _breakableBlockRate = 0.4f;
-
-    [SerializeField] private int _randomSeed = 12345;
+    [SerializeField] private StageSettings _settings;
 
     /// <summary>固定床、外壁、破壊可能Blockの順にステージを生成します。</summary>
     public void GenerateStage()
     {
-        Random.InitState(_randomSeed);
+        if (_gridManager == null || _settings == null)
+        {
+            Debug.LogError("StageGeneratorのGridManagerまたはStage Settingsが未設定です。", this);
+            return;
+        }
+
+        Random.InitState(_settings.RandomSeed);
         GenerateFloor();
         GenerateOuterWalls();
         GenerateBreakableBlocks();
@@ -38,7 +38,7 @@ public class StageGenerator : MonoBehaviour
         {
             for (int z = 0; z < size.z; z++)
             {
-                SpawnBlock(new Vector3Int(x, 0, z), _unbreakableBlockPrefab);
+                SpawnBlock(new Vector3Int(x, _settings.FloorY, z), _settings.UnbreakableBlockPrefab);
             }
         }
     }
@@ -49,20 +49,20 @@ public class StageGenerator : MonoBehaviour
     private void GenerateOuterWalls()
     {
         Vector3Int size = _gridManager.Size;
-        const int wallY = 1;
+        int wallY = _settings.WallY;
 
         for (int x = 0; x < size.x; x++)
         {
-            SpawnBlock(new Vector3Int(x, wallY, 0), _unbreakableBlockPrefab);
+            SpawnBlock(new Vector3Int(x, wallY, 0), _settings.UnbreakableBlockPrefab);
 
-            SpawnBlock(new Vector3Int(x, wallY, size.z - 1), _unbreakableBlockPrefab);
+            SpawnBlock(new Vector3Int(x, wallY, size.z - 1), _settings.UnbreakableBlockPrefab);
         }
 
         for (int z = 1; z < size.z - 1; z++)
         {
-            SpawnBlock(new Vector3Int(0, wallY, z), _unbreakableBlockPrefab);
+            SpawnBlock(new Vector3Int(0, wallY, z), _settings.UnbreakableBlockPrefab);
 
-            SpawnBlock(new Vector3Int(size.x - 1, wallY, z), _unbreakableBlockPrefab);
+            SpawnBlock(new Vector3Int(size.x - 1, wallY, z), _settings.UnbreakableBlockPrefab);
         }
     }
 
@@ -94,7 +94,7 @@ public class StageGenerator : MonoBehaviour
     private void GenerateBreakableBlocks()
     {
         Vector3Int size = _gridManager.Size;
-        const int blockY = 1;
+        int blockY = _settings.BreakableBlockY;
 
         for (int x = 1; x < size.x - 1; x++)
         {
@@ -105,10 +105,10 @@ public class StageGenerator : MonoBehaviour
                 if (IsSpawnSafeCell(position))
                     continue;
 
-                if (Random.value > _breakableBlockRate)
+                if (Random.value > _settings.BreakableBlockRate)
                     continue;
 
-                SpawnBlock(position, _breakableBlockPrefab);
+                SpawnBlock(position, _settings.BreakableBlockPrefab);
             }
         }
     }
@@ -116,11 +116,11 @@ public class StageGenerator : MonoBehaviour
     /// <summary>指定セルがPlayerの開始地点または脱出用セルかを判定します。</summary>
     private bool IsSpawnSafeCell(Vector3Int position)
     {
-        return position == _playerSpawnPosition ||
-               position == _enemySpawnPosition ||
-               position == _playerSpawnPosition + Vector3Int.right ||
-               position == _playerSpawnPosition + Vector3Int.forward ||
-               position == _enemySpawnPosition + Vector3Int.left ||
-               position == _enemySpawnPosition + Vector3Int.back;
+        return position == _settings.PlayerSpawnPosition ||
+               position == _settings.EnemySpawnPosition ||
+               position == _settings.PlayerSpawnPosition + Vector3Int.right ||
+               position == _settings.PlayerSpawnPosition + Vector3Int.forward ||
+               position == _settings.EnemySpawnPosition + Vector3Int.left ||
+               position == _settings.EnemySpawnPosition + Vector3Int.back;
     }
 }

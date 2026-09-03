@@ -126,7 +126,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5580d21800a41f240873e82e91e24506, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Bomb
-  _fallDurationPerCell: 0.12
 --- !u!114 &2864303484621284981
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -139,8 +138,4 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 414de7b5383b20f45ade1964628e9625, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ExplosionView
-  _centerPrefab: {fileID: 8482292165910165399, guid: 6ef2efc0177b59f40a684b110072599e, type: 3}
-  _middlePrefab: {fileID: 7668013735683936945, guid: 6e1e098ee3c5d1f419e40a57b0903554, type: 3}
-  _endPrefab: {fileID: 1543558058330922319, guid: fa7a44c8d65880f4da0a8ab82cb021b6, type: 3}
-  _blockedEndPrefab: {fileID: 8294232777165737635, guid: d67dca97fe1dba54182705c3f28a1271, type: 3}
-  _effectDuration: 0.35
+  _settings: {fileID: 11400000, guid: 02d0b4616a55c344e93aec4da2b9e1d2, type: 2}
