@@ -429,6 +429,7 @@ Blockを置けない場合、以下をConsoleへ出す実装になっている�
 - ExplosionViewが計算済み爆風セルへ見た目専用Effectを生成
 - ExplosionEffectが設定時間後に自身を破棄
 - 爆風セルを`Center`、`Middle`、`End`、`BlockedEnd`に分類し、6方向へ回転表示
+- Editorメニューから爆風Materialと4種類のParticle Prefabを自動生成可能
 - 落下Blockが通過する各セルをGrid基準で判定し、Characterを押し潰して死亡させる処理
 
 ## 9. 既知の課題・注意点
@@ -466,6 +467,13 @@ Blockを置けない場合、以下をConsoleへ出す実装になっている�
 11. 計算結果を使って爆風Effectを表示する（コード実装済み・Prefab設定待ち）
 
 Explosion EffectのEditor設定:
+
+自動生成する場合:
+
+1. ProjectウィンドウでBomb Prefabを選択する
+2. `Tools > 3D Grid Bomber > Create Explosion Effect Prefabs`を実行する
+3. `Assets/Prefabs/Effects/Explosion`と`Assets/Materials/Effects/Explosion`を確認する
+4. Bomb Prefabを選択して実行した場合、4種類の参照も自動設定される
 
 1. Center、Middle、End、必要ならBlockedEndの見た目用Prefabを作る
 2. 各Prefabへ`ExplosionEffect`を追加する
