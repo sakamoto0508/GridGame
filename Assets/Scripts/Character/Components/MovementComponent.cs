@@ -32,6 +32,24 @@ public class MovementComponent : MonoBehaviour
     /// <summary>新しい移動要求を受け付けられない状態ならtrueです。</summary>
     public bool IsBusy => _state != CharacterMoveState.Grounded;
 
+    /// <summary>AIが経路の到着時間を予測するための通常移動時間です。</summary>
+    public float MoveDuration => _settings != null ? _settings.MoveDuration : 0f;
+
+    /// <summary>AIが経路の到着時間を予測するための段差ジャンプ時間です。</summary>
+    public float JumpDuration => _settings != null
+        ? _settings.JumpUpDuration + _settings.AirTime
+        : 0f;
+
+    /// <summary>移動せずに水平4方向へ向きを変更します。AIのBlock設置にも使用します。</summary>
+    public bool TryFace(Vector3Int direction)
+    {
+        if (IsBusy || !IsHorizontalDirection(direction))
+            return false;
+
+        _facingDirection = direction;
+        return true;
+    }
+
     [SerializeField] private CharacterMovementSettings _settings;
 
     private GridManager _gridManager;

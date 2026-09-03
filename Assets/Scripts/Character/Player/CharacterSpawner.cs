@@ -82,7 +82,17 @@ public class CharacterSpawner : MonoBehaviour
             Quaternion.identity);
         MovementComponent movement = enemy.GetComponent<MovementComponent>();
         BombComponent bombComponent = enemy.GetComponent<BombComponent>();
+        BlockPlacementComponent blockPlacement = enemy.GetComponent<BlockPlacementComponent>();
         EnemyBrain enemyBrain = enemy.GetComponent<EnemyBrain>();
+
+        // 既存Enemy PrefabにはRequireComponent追加が遡って反映されないため補完します。
+        if (blockPlacement == null)
+        {
+            blockPlacement = enemy.gameObject.AddComponent<BlockPlacementComponent>();
+            Debug.LogWarning(
+                "Enemy PrefabにBlockPlacementComponentがなかったため実行時に追加しました。Prefabへの追加を推奨します。",
+                enemy);
+        }
 
         if (movement == null || !movement.Init(_gridManager, gridPosition))
         {
@@ -91,10 +101,10 @@ public class CharacterSpawner : MonoBehaviour
             return null;
         }
 
-        if (bombComponent == null || enemyBrain == null)
+        if (bombComponent == null || blockPlacement == null || enemyBrain == null)
         {
             Debug.LogError(
-                "Test EnemyにBombComponentまたはEnemyBrainがありません。Enemy Prefabを確認してください。",
+                "Test EnemyにBombComponent、BlockPlacementComponent、EnemyBrainのいずれかがありません。Enemy Prefabを確認してください。",
                 enemy);
             movement.UnregisterFromGrid();
             Destroy(enemy.gameObject);
@@ -102,6 +112,7 @@ public class CharacterSpawner : MonoBehaviour
         }
 
         bombComponent.Init(_gridManager, _settings.BombPrefab);
+        blockPlacement.Init(_gridManager, _settings.PlaceableBlockPrefab);
 
         if (!enemyBrain.Init(_gridManager, player, difficulty, enemyAISettings))
         {

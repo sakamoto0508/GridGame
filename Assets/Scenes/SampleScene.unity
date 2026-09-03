@@ -541,7 +541,7 @@ MonoBehaviour:
   _stageGenerator: {fileID: 1948648122}
   _characterSpawner: {fileID: 1819605900}
   _gameState: {fileID: 2059915499}
-  _enemyDifficulty: 1
+  _enemyDifficulty: 2
   _enemyAISettings: {fileID: 11400000, guid: bae13266d66760848ad718861d48ef5f, type: 2}
 --- !u!4 &1308266403
 Transform:

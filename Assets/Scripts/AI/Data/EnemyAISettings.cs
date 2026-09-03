@@ -10,12 +10,19 @@ public class EnemyDifficultyValues
     [SerializeField, Range(0f, 1f)] private float _bombPlaceChance = 0.4f;
     [SerializeField, Min(0)] private int _detectionRange = 6;
     [SerializeField, Min(0)] private int _bombDistance = 2;
+    [Header("Stuck Recovery")]
+    [SerializeField, Min(2)] private int _maxSameCellDecisions = 3;
+    [SerializeField, Min(0.05f)] private float _reconsiderPause = 0.6f;
+    [SerializeField, Min(0.05f)] private float _escapeSafeConfirmationTime = 0.6f;
 
     public float ActionInterval => _actionInterval;
     public float MistakeChance => _mistakeChance;
     public float BombPlaceChance => _bombPlaceChance;
     public int DetectionRange => _detectionRange;
     public int BombDistance => _bombDistance;
+    public int MaxSameCellDecisions => Mathf.Max(2, _maxSameCellDecisions);
+    public float ReconsiderPause => Mathf.Max(0.05f, _reconsiderPause);
+    public float EscapeSafeConfirmationTime => Mathf.Max(0.05f, _escapeSafeConfirmationTime);
 
     public EnemyDifficultyValues() { }
 

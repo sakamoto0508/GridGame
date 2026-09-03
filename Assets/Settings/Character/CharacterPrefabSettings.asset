@@ -14,5 +14,5 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CharacterPrefabSettings
   _playerPrefab: {fileID: 5385244386857594380, guid: f8260c422c87b9e4b9144938cf7b9403, type: 3}
   _enemyPrefab: {fileID: -5498632619220628304, guid: d598d128b8af15a41b75414f7e930d91, type: 3}
-  _placeableBlockPrefab: {fileID: 1599753650031697247, guid: 1a45a7693cc40a44c9525c826b4eed3c, type: 3}
+  _placeableBlockPrefab: {fileID: 1599753650031697247, guid: 44a21dc743035fe4393d59aba124f04a, type: 3}
   _bombPrefab: {fileID: 3222483694492082107, guid: acdb0fbb6fff32f48bd33e962a7e5973, type: 3}

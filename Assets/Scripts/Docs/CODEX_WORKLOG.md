@@ -599,6 +599,36 @@ Assets/Settings
 - CharacterSpawner → CharacterPrefabSettings
 - Player/EnemyのMovementComponent → CharacterMovementSettings
 - Player/EnemyのBombComponent → BombSettings
+
+## Enemy AI危険回避（2026-09-04）
+
+- `GridDangerMap`を実装し、盤面上のBombを走査して爆発予定セルと残り時間を記録するようにした。
+- 爆風範囲は`ExplosionSystem.CalculateAffectedCells()`を再利用し、実際の爆発判定との不一致を防いでいる。
+- `GridPathfindingSystem`へ水平4方向の幅優先探索を実装した。
+- Enemyは現在地が危険な場合、追跡・Bomb設置より先に最寄りの安全セルへ移動する。
+- 経路探索は同じ高さの水平移動に加え、隣接する1段高いBlock上へのジャンプに対応。
+- DangerMapはBomb同士の連鎖関係を反復計算し、誘爆によって前倒しされる爆発時刻を反映する。
+- 経路探索は移動・ジャンプ時間とAIの行動間隔を考慮し、爆発前に通過できないセルを除外する。
+- Bomb設置前に仮想BombをDangerMapへ追加し、安全セルへの経路がある場合だけ設置する。
+- EnemyはPlayerへ爆風が届く移動候補を優先し、攻撃可能な位置からBomb設置を試みる。
+- Enemyは直前にいたセルを記録し、ほかに候補がある場合は直前セルへの後退を最後に評価する。
+- 危険回避中は決定した逃走経路を保持し、安全になるか経路が塞がれるまで同じ方針で進む。
+- 安全セルへ脱出した後も、Bombが残っている間は通常追跡で爆風予定セルへ再進入しない。
+- 通常行動で`A→B→A→B`となる2セル往復を検出し、往復先を数回分の思考時間だけ候補から外す。
+- 往復抑制は通常追跡・徘徊だけに適用し、Escape中に必要な後退は妨げない。
+- `EnemyAIState`（Idle / Chase / MoveToAttackPosition / PlaceBomb / Escape）を導入した。
+- 生存判断を最優先し、Bomb設置成功後は即座にEscapeへ遷移する。
+- 現在状態はEnemyBrainのInspectorで確認でき、状態変化はConsoleへ出力される。
+- Chaseでは安全な通常移動に加え、既存Block上への1段ジャンプを選択できる。
+- 通常移動と既存Blockでは近づけない場合、安定した足場上へBlockを設置し、次の行動でその上へジャンプする。
+- Escapeでも通常経路がない場合、設置とジャンプが爆発時刻に間に合う場合だけBlock足場を作る。
+- EnemyのBlockPlacementComponentはCharacterSpawnerから初期化され、古いPrefabで不足している場合は実行時に補完される。
+- 同じセルでBomb設置失敗など同一判断を繰り返した回数を検出し、別方向への移動または短時間の再考待機を行う。
+- 反復検出回数と待機時間はEnemyAISettingsの`Max Same Cell Decisions`、`Reconsider Pause`で難易度別に調整できる。
+- Bomb設置後は、自分のBombが盤面から消えるまでEscape状態を保持する。安全セル到着直後に攻撃へ戻る状態振動を防止する。
+- Escape解除には、現在地・水平隣接セル・ジャンプ着地候補が一定時間連続して安全であることを要求する。
+- 安全確認時間はEnemyAISettingsの`Escape Safe Confirmation Time`で難易度別に調整できる。
+- 低い場所への意図的な降下は今後の拡張項目。
 - Breakable/Unbreakable/配置用Block → 対応するBlockSettings
 - GridBomberGameMode → EnemyAISettings
 - BombのExplosionView → ExplosionVisualSettings

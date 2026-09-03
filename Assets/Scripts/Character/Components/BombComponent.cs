@@ -13,6 +13,9 @@ public class BombComponent : MonoBehaviour
     /// <summary>同時に設置できる最大Bomb数です。</summary>
     public int MaxBombCount => _settings != null ? _settings.MaxBombCount : 0;
 
+    public float FuseTime => _settings != null ? _settings.FuseTime : 0f;
+    public int ExplosionPower => _settings != null ? _settings.ExplosionPower : 0;
+
     [SerializeField] private BombSettings _settings;
 
     private GridManager _gridManager;
