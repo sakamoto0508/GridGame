@@ -83,6 +83,25 @@ public class MovementComponent : MonoBehaviour
     }
 
     /// <summary>
+    /// 死亡・退場時に現在占有しているGridCellからCharacterを登録解除します。
+    /// すでに未登録の場合はfalseを返します。
+    /// </summary>
+    public bool UnregisterFromGrid()
+    {
+        if (!_isInitialized || _gridManager == null || _character == null)
+            return false;
+
+        bool wasUnregistered = _gridManager.TryUnregisterCharacter(
+            _currentGridPosition,
+            _character);
+
+        if (wasUnregistered)
+            _isInitialized = false;
+
+        return wasUnregistered;
+    }
+
+    /// <summary>
     /// 水平4方向の隣接セルへの移動を試みます。
     /// 要求を受理できた時点でtrueを返し、表示位置は非同期で補間します。
     /// </summary>

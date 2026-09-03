@@ -6,8 +6,9 @@ using UnityEngine.InputSystem;
 /// </summary>
 public class PlayerController : MonoBehaviour
 {
-    [SerializeField] private MovementComponent _movementComponent;
-    [SerializeField] private BlockPlacementComponent _blockPlacementComponent;
+    private MovementComponent _movementComponent;
+    private BlockPlacementComponent _blockPlacementComponent;
+    private BombComponent _bombComponent;
     private Camera _camera;
     private Vector2 _moveInput;
 
@@ -15,6 +16,9 @@ public class PlayerController : MonoBehaviour
     public void Init(Camera gameCamera)
     {
         _camera= gameCamera;
+        _movementComponent = GetComponent<MovementComponent>();
+        _blockPlacementComponent = GetComponent<BlockPlacementComponent>();
+        _bombComponent = GetComponent<BombComponent>();
     }
 
     /// <summary>
@@ -63,6 +67,23 @@ public class PlayerController : MonoBehaviour
         }
 
         _blockPlacementComponent.TryPlaceBlock();
+    }
+
+    /// <summary>現在セルへのBomb設置を要求します。</summary>
+    public void OnPlaceBomb(InputAction.CallbackContext context)
+    {
+        if (!context.started)
+            return;
+
+        if (_bombComponent == null)
+        {
+            Debug.LogWarning(
+                "Bomb設置入力を受け取りましたが、PlayerControllerのBomb Componentが未設定です。",
+                this);
+            return;
+        }
+
+        _bombComponent.TryPlaceBomb();
     }
 
     /// <summary>

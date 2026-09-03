@@ -102,6 +102,50 @@ public class GridManager : MonoBehaviour
     }
 
     /// <summary>
+    /// 指定セルに存在するBlockを返します。
+    /// セルが範囲外、またはBlockが存在しない場合はnullを返します。
+    /// </summary>
+    public Block GetBlock(Vector3Int position)
+    {
+        GridCell cell = GetCell(position);
+        return cell?.Block;
+    }
+
+    /// <summary>
+    /// 指定セルに存在するCharacterを返します。
+    /// セルが範囲外、またはCharacterが存在しない場合はnullを返します。
+    /// </summary>
+    public CharacterBase GetCharacter(Vector3Int position)
+    {
+        GridCell cell = GetCell(position);
+        return cell?.Character;
+    }
+
+    /// <summary>
+    /// 指定セルに存在するBombを返します。
+    /// セルが範囲外、またはBombが存在しない場合はnullを返します。
+    /// </summary>
+    public Bomb GetBomb(Vector3Int position)
+    {
+        GridCell cell = GetCell(position);
+        return cell?.Bomb;
+    }
+
+    /// <summary>
+    /// 落下中のBlockが指定セルを通過できるか判定します。
+    /// Characterは押し潰す対象なので、Blockの落下を妨げません。
+    /// </summary>
+    public bool CanFallingBlockEnter(Vector3Int position)
+    {
+        GridCell cell = GetCell(position);
+
+        return cell != null &&
+               cell.Block == null &&
+               cell.Bomb == null &&
+               !cell.IsReserved;
+    }
+
+    /// <summary>
     /// 方向先にある1段高いBlockの上へジャンプできるかを判定します。
     /// 成功時はBlock上の着地セルを返します。
     /// </summary>
@@ -161,6 +205,48 @@ public class GridManager : MonoBehaviour
         {
             failureReason =
                 $"対象セル {position} にはCharacter '{cell.Character.name}' が存在します。";
+            return false;
+        }
+
+        if (cell.IsReserved)
+        {
+            failureReason = $"対象セル {position} は予約されています。";
+            return false;
+        }
+
+        failureReason = string.Empty;
+        return true;
+    }
+
+    /// <summary>指定セルへBombを配置できるかを判定します。</summary>
+    public bool CanPlaceBomb(Vector3Int position)
+    {
+        return CanPlaceBomb(position, out _);
+    }
+
+    /// <summary>
+    /// 指定セルへBombを配置できるかを判定し、失敗時は理由を返します。
+    /// CharacterとBombは同じセルに存在できるため、Characterは妨げになりません。
+    /// </summary>
+    public bool CanPlaceBomb(Vector3Int position, out string failureReason)
+    {
+        GridCell cell = GetCell(position);
+
+        if (cell == null)
+        {
+            failureReason = $"対象セル {position} がグリッド範囲外です。";
+            return false;
+        }
+
+        if (cell.Block != null)
+        {
+            failureReason = $"対象セル {position} にはBlock '{cell.Block.name}' が存在します。";
+            return false;
+        }
+
+        if (cell.Bomb != null)
+        {
+            failureReason = $"対象セル {position} にはBomb '{cell.Bomb.name}' が存在します。";
             return false;
         }
 
@@ -263,6 +349,13 @@ public class GridManager : MonoBehaviour
         return cell.RemoveBlock(block);
     }
 
+    /// <summary>
+    /// 指定されたグリッド座標から別のグリッド座標にブロックを移動させる。
+    /// </summary>
+    /// <param name="from"></param>
+    /// <param name="to"></param>
+    /// <param name="block"></param>
+    /// <returns></returns>
     public bool TryMoveBlock(Vector3Int from, Vector3Int to, Block block)
     {
         GridCell fromCell = GetCell(from);
@@ -270,7 +363,7 @@ public class GridManager : MonoBehaviour
 
         if (fromCell == null || toCell == null)
             return false;
-        if (toCell.Block != null)
+        if (fromCell.Block != block || !CanFallingBlockEnter(to))
             return false;
         // 先に移動先を確保する
         if (!toCell.TrySetBlock(block))
@@ -283,6 +376,77 @@ public class GridManager : MonoBehaviour
         }
         return true;
     }
+
+    /// <summary>
+    /// 指定されたグリッド座標から別のグリッド座標に爆弾を移動させる。
+    /// </summary>
+    /// <param name="from"></param>
+    /// <param name="to"></param>
+    /// <param name="bomb"></param>
+    /// <returns></returns>
+    public bool TryMoveBomb(Vector3Int from, Vector3Int to, Bomb bomb)
+    {
+        GridCell fromCell = GetCell(from);
+        GridCell toCell = GetCell(to);
+        if (fromCell == null || toCell == null)
+            return false;
+        if (fromCell.Bomb != bomb || !CanPlaceBomb(to))
+            return false;
+        // 先に移動先を確保する
+        if (!toCell.TrySetBomb(bomb))
+            return false;
+        // 移動元の解除に失敗したら元へ戻す
+        if (!fromCell.RemoveBomb(bomb))
+        {
+            toCell.RemoveBomb(bomb);
+            return false;
+        }
+        return true;
+    }
+
+    /// <summary>
+    /// 指定されたグリッド座標に爆弾を登録する。
+    /// </summary>
+    /// <param name="position"></param>
+    /// <param name="bomb"></param>
+    /// <returns></returns>
+    public bool TryRegisterBomb(Vector3Int position, Bomb bomb)
+    {
+        if (!CanPlaceBomb(position))
+            return false;
+
+        GridCell cell = GetCell(position);
+        return cell.TrySetBomb(bomb);
+    }
+
+    /// <summary>
+    /// 指定されたグリッド座標から爆弾を登録解除する。
+    /// </summary>
+    /// <param name="position"></param>
+    /// <param name="bomb"></param>
+    /// <returns></returns>
+    public bool TryUnregisterBomb(Vector3Int position, Bomb bomb)
+    {
+        GridCell cell = GetCell(position);
+        if (cell == null || cell.Bomb != bomb)
+            return false;
+        return cell.RemoveBomb(bomb);
+    }
+
+    /// <summary>
+    /// 指定されたグリッド座標のセルを予約する。予約済みのセルは他のオブジェクトが使用できなくなる。
+    /// </summary>
+    /// <param name="position"></param>
+    /// <returns></returns>
+    public bool TryReserveCell(Vector3Int position)
+    {
+        GridCell cell = GetCell(position);
+        if (cell == null || cell.IsReserved)
+            return false;
+        cell.Reserve();
+        return true;
+    }
+
 
     /// <summary>
     /// Gizmosを描画するためのメソッド。Unityエディタ上でグリッドの可視化に使用される。

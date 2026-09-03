@@ -17,6 +17,9 @@ public class GridCell
     public Item Item { get; private set; }
     public CharacterBase Character { get; private set; }
 
+    /// <summary>
+    /// このセルが予約されているかどうかを示すフラグ。予約されている場合、キャラクターはこのセルに移動できません。
+    /// </summary>
     public bool IsReserved { get; private set; }
 
     public bool IsWalkable =>
@@ -45,7 +48,8 @@ public class GridCell
     /// <returns></returns>
     public bool TrySetBlock(Block block)
     {
-        if (block == null || Block != null)
+        // 落下BlockはCharacterと同居して押し潰せるが、Bomb・予約セルとは重複できない。
+        if (block == null || Block != null || Bomb != null || IsReserved)
             return false;
         Block = block;
         return true;
@@ -76,5 +80,40 @@ public class GridCell
             return false;
         Block = null;
         return true;
+    }
+
+    /// <summary>
+    /// 指定された爆弾をこのセルに設定しようとします。
+    /// </summary>
+    /// <param name="bomb"></param>
+    /// <returns></returns>
+    public bool TrySetBomb(Bomb bomb)
+    {
+        // Characterとは同居可能だが、Block・既存Bomb・予約セルとは重複させない。
+        if (bomb == null || Block != null || Bomb != null || IsReserved)
+            return false;
+        Bomb = bomb;
+        return true;
+    }
+
+    /// <summary>
+    /// 指定された爆弾をこのセルから削除しようとします。
+    /// </summary>
+    /// <param name="bomb"></param>
+    /// <returns></returns>
+    public bool RemoveBomb(Bomb bomb)
+    {
+        if (Bomb != bomb)
+            return false;
+        Bomb = null;
+        return true;
+    }
+
+    /// <summary>
+    /// このセルを予約します。予約済みのセルは他のオブジェクトが使用できなくなる。
+    /// </summary>
+    public void Reserve()
+    {
+        IsReserved = true;
     }
 }

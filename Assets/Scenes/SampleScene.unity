@@ -507,9 +507,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 709c5888ba2b50346946fc022d209091, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::GridManager
-  _sizeX: 10
-  _sizeY: 10
-  _sizeZ: 10
+  _sizeX: 15
+  _sizeY: 15
+  _sizeZ: 15
   _cellSize: 1
 --- !u!4 &1574428505
 Transform:
@@ -558,6 +558,8 @@ MonoBehaviour:
   _gridManager: {fileID: 1574428504}
   _playerPrefab: {fileID: 5385244386857594380, guid: f8260c422c87b9e4b9144938cf7b9403, type: 3}
   _gameCamera: {fileID: 330585545}
+  _placeableBlockPrefab: {fileID: 1599753650031697247, guid: 44a21dc743035fe4393d59aba124f04a, type: 3}
+  _bombPrefab: {fileID: 3222483694492082107, guid: acdb0fbb6fff32f48bd33e962a7e5973, type: 3}
 --- !u!4 &1819605901
 Transform:
   m_ObjectHideFlags: 0

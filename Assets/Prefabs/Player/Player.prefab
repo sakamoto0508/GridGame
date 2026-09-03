@@ -17,6 +17,8 @@ GameObject:
   - component: {fileID: 3438229355089722398}
   - component: {fileID: 7908279401514383810}
   - component: {fileID: 8618956708731586975}
+  - component: {fileID: 2566867246732464064}
+  - component: {fileID: 5727676479337692953}
   m_Layer: 0
   m_Name: Player
   m_TagString: Untagged
@@ -260,6 +262,22 @@ MonoBehaviour:
         m_CallState: 2
     m_ActionId: f7441122-c917-47f1-acd7-d90126cf877a
     m_ActionName: 'Player/PlaceBlock[/Keyboard/e]'
+  - m_PersistentCalls:
+      m_Calls:
+      - m_Target: {fileID: 3438229355089722398}
+        m_TargetAssemblyTypeName: PlayerController, Assembly-CSharp
+        m_MethodName: OnPlaceBomb
+        m_Mode: 0
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 0
+        m_CallState: 2
+    m_ActionId: 1d40ef8b-f290-488a-8e86-55dd9c316278
+    m_ActionName: 'Player/PlaceBomb[/Keyboard/r]'
   m_NeverAutoSwitchControlSchemes: 0
   m_DefaultControlScheme: 
   m_DefaultActionMap: Player
@@ -289,8 +307,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 09bc937354dfa914daccc3f0121bb699, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerController
-  _movementComponent: {fileID: 7908279401514383810}
-  _blockPlacementComponent: {fileID: 8618956708731586975}
 --- !u!114 &7908279401514383810
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -320,3 +336,30 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1fbb5c2a26d892f44accbd85221e4058, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::BlockPlacementComponent
+--- !u!114 &2566867246732464064
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2040485848153227198}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7c447c89c73a5af42aee4facf15d156b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::LifeComponent
+--- !u!114 &5727676479337692953
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2040485848153227198}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4a73b3f23841a20488cf71c47a2e432b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::BombComponent
+  _maxBombCount: 5
+  _fuseTime: 3
+  _explosionPower: 1
