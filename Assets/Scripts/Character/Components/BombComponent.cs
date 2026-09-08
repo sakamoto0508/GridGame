@@ -11,10 +11,13 @@ public class BombComponent : MonoBehaviour
     public int CurrentBombCount => _currentBombCount;
 
     /// <summary>同時に設置できる最大Bomb数です。</summary>
-    public int MaxBombCount => _settings != null ? _settings.MaxBombCount : 0;
+    public int MaxBombCount => _settings != null ? _settings.MaxBombCount + BonusCount : 0;
 
     public float FuseTime => _settings != null ? _settings.FuseTime : 0f;
-    public int ExplosionPower => _settings != null ? _settings.ExplosionPower : 0;
+    public int ExplosionPower => _settings != null ? _settings.ExplosionPower + BonusPower : 0;
+    // 古いPrefabへInventoryが後から追加されても、その時点の値を参照します。
+    private int BonusCount => GetComponent<InventoryComponent>()?.BombCountBonus ?? 0;
+    private int BonusPower => GetComponent<InventoryComponent>()?.BombPowerBonus ?? 0;
 
     [SerializeField] private BombSettings _settings;
 
@@ -56,10 +59,10 @@ public class BombComponent : MonoBehaviour
             return false;
         }
 
-        if (_currentBombCount >= _settings.MaxBombCount)
+        if (_currentBombCount >= MaxBombCount)
         {
             Debug.LogWarning(
-                $"Bombを設置できません: 最大同時設置数 {_settings.MaxBombCount} に達しています。",
+                $"Bombを設置できません: 最大同時設置数 {MaxBombCount} に達しています。",
                 this);
             return false;
         }
@@ -86,7 +89,7 @@ public class BombComponent : MonoBehaviour
 
         _currentBombCount++;
         bomb.Exploded += HandleBombExploded;
-        bomb.Init(_gridManager, position, _owner, _settings);
+        bomb.Init(_gridManager, position, _owner, _settings, ExplosionPower);
         return true;
     }
 

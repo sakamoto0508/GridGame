@@ -15,6 +15,20 @@ public class GridCell
     public Block Block { get; private set; }
     public Bomb Bomb { get; private set; }
     public Item Item { get; private set; }
+    /// <summary>ItemはCharacter・Bombと同居可能ですが、Block・予約セルには置けません。</summary>
+    public bool TrySetItem(Item item)
+    {
+        if (item == null || Item != null || Block != null || IsReserved) return false;
+        Item = item;
+        return true;
+    }
+
+    public bool RemoveItem(Item item)
+    {
+        if (Item != item) return false;
+        Item = null;
+        return true;
+    }
     public CharacterBase Character { get; private set; }
 
     /// <summary>

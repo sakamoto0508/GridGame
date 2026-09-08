@@ -11,6 +11,60 @@ using UnityEngine;
 /// </summary>
 public class GridManager : MonoBehaviour
 {
+    /// <summary>
+    /// 指定されたグリッド座標に存在するアイテムを取得する。
+    /// </summary>
+    /// <param name="position"></param>
+    /// <returns></returns>
+    public Item GetItem(Vector3Int position) => GetCell(position)?.Item;
+
+    /// <summary>
+    /// 指定されたグリッド座標にアイテムを配置できるかどうかを判定する。
+    /// </summary>
+    /// <param name="position"></param>
+    /// <returns></returns>
+    public bool CanPlaceItem(Vector3Int position)
+    {
+        GridCell cell = GetCell(position);
+        return cell != null && cell.Item == null && cell.Block == null && !cell.IsReserved;
+    }
+
+    /// <summary>
+    /// 指定されたグリッド座標にアイテムを登録する。
+    /// </summary>
+    /// <param name="position"></param>
+    /// <param name="item"></param>
+    /// <returns></returns>
+    public bool TryRegisterItem(Vector3Int position, Item item)
+        => CanPlaceItem(position) && GetCell(position).TrySetItem(item);
+
+    /// <summary>
+    /// 指定されたグリッド座標からアイテムを登録解除する。
+    /// </summary>
+    /// <param name="position"></param>
+    /// <param name="item"></param>
+    /// <returns></returns>
+    public bool TryUnregisterItem(Vector3Int position, Item item)
+        => GetCell(position) != null && GetCell(position).RemoveItem(item);
+
+    /// <summary>移動元を照合し、移動先を確保してからItemの登録を移します。</summary>
+    public bool TryMoveItem(Vector3Int from, Vector3Int to, Item item)
+    {
+        if (item == null || GetItem(from) != item || !TryRegisterItem(to, item)) return false;
+        if (TryUnregisterItem(from, item)) return true;
+        TryUnregisterItem(to, item);
+        return false;
+    }
+
+    public int CountItems()
+    {
+        int count = 0;
+        for (int x = 0; x < Size.x; x++)
+        for (int y = 0; y < Size.y; y++)
+        for (int z = 0; z < Size.z; z++)
+            if (GetItem(new Vector3Int(x, y, z)) != null) count++;
+        return count;
+    }
     public Vector3Int Size => _settings != null ? _settings.Size : Vector3Int.zero;
 
     [SerializeField] private GridSettings _settings;

@@ -39,6 +39,7 @@ public class MovementComponent : MonoBehaviour
     public float JumpDuration => _settings != null
         ? _settings.JumpUpDuration + _settings.AirTime
         : 0f;
+    public float FallDurationPerCell => _settings != null ? _settings.FallDuration : 0f;
 
     /// <summary>移動せずに水平4方向へ向きを変更します。AIのBlock設置にも使用します。</summary>
     public bool TryFace(Vector3Int direction)
@@ -142,6 +143,47 @@ public class MovementComponent : MonoBehaviour
         _currentGridPosition = destination;
         _ = MoveAwaitable(_gridManager.GetWorldPosition(destination));
         return true;
+    }
+
+    /// <summary>水平へ踏み出した後、その先にある低い足場まで移動と落下を連続実行します。</summary>
+    public bool TryMoveAndFall(Vector3Int direction)
+    {
+        if (IsBusy || !IsHorizontalDirection(direction))
+            return false;
+
+        _facingDirection = direction;
+        if (!GridGravitySystem.TryGetStepAndFallDestination(
+                _gridManager, _currentGridPosition, direction,
+                out Vector3Int edgePosition, out Vector3Int landingPosition))
+            return false;
+
+        Vector3Int startPosition = _currentGridPosition;
+        if (!_gridManager.TryMoveCharacter(startPosition, landingPosition, _character))
+            return false;
+
+        _currentGridPosition = landingPosition;
+        _ = MoveAndFallAwaitable(edgePosition, landingPosition);
+        return true;
+    }
+
+    private async Awaitable MoveAndFallAwaitable(
+        Vector3Int edgePosition, Vector3Int landingPosition)
+    {
+        _state = CharacterMoveState.Moving;
+        try
+        {
+            await MoveToAwaitable(
+                _gridManager.GetWorldPosition(edgePosition), _settings.MoveDuration);
+            _state = CharacterMoveState.Falling;
+            int fallDistance = edgePosition.y - landingPosition.y;
+            await MoveToAwaitable(
+                _gridManager.GetWorldPosition(landingPosition),
+                _settings.FallDuration * Mathf.Max(1, fallDistance));
+        }
+        finally
+        {
+            _state = CharacterMoveState.Grounded;
+        }
     }
 
     /// <summary>

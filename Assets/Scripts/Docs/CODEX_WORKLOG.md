@@ -1,6 +1,29 @@
 # 3D Grid Bomber — Codex作業ログ兼仕様書
 
-最終更新: 2026-09-03
+最終更新: 2026-09-08
+
+## Item・Blockプール化（2026-09-08）
+
+- GridObjectPoolを導入。GridManagerごと・Prefabごとに共有し、StageGenerator、BlockPlacementComponent、ItemManagerの生成をRentへ変更。
+- PooledGridObjectをItem/Blockの共通基底とし、取得・破壊・生成失敗時に登録解除して返却。SO設定と既存Prefabは継続利用できる。
+- Itemの取得・落下状態をリセット。Blockは世代番号で返却前のAwaitableを無効化し、再利用後の個体に古い処理が触れないようにした。
+- Scene終了でプールも破棄する。Bomb/爆発演出は対象外。使い方と確認項目は`Docs/OBJECT_POOL.md`。
+
+## Camera方針変更（2026-09-08）
+
+- Cinemachineを使用する方針のため、独自のPlayerCameraFollow、CameraFollowSettingsと対応meta、Spawnerでの追従初期化、専用SO生成処理を削除。
+- CharacterSpawnerのGame CameraとPlayerControllerへの注入は、カメラ基準入力に必要なので維持。Camera未指定時はCamera.mainを利用する。
+- 今回は不要要素の削除のみ。生成PlayerをCinemachineの追従対象へ割り当てる処理やScene設定は未実装。
+
+## Item実装（2026-09-08）
+
+- BombPower/BombCountの2種類を実装。ItemSettingsとItemDropSettingsで調整する。
+- GridCell/GridManagerへItem登録・移動・解除APIを追加。Itemは1セルずつ落下し、到着セルのCharacterへ効果を与える。
+- InventoryComponentがCharacterごとのボーナスを保持。SOを変更しない。BombComponentとAIの仮想予測は強化済み性能を参照する。
+- Bombは設置時の射程を固定。爆風中のItemは破壊される。
+- ItemManagerはPlaying中のみ定期出現・盤面上限を管理。
+- EditorのCreate Item Assetsメニューで既存設定を保持しつつテストPrefab/設定を生成可能。
+- Unity設定・仕様・確認手順は`Docs/ITEM_SETUP.md`。CollectItem AI、速度/貫通Item、能力HUDは未実装。
 
 このファイルは、別のCodexチャットや別の開発者が現在の状態から作業を再開するための引き継ぎ資料である。
 コードを変更した際は「現在の実装状況」「既知の課題」「次に実装する項目」も更新すること。
@@ -628,7 +651,13 @@ Assets/Settings
 - Bomb設置後は、自分のBombが盤面から消えるまでEscape状態を保持する。安全セル到着直後に攻撃へ戻る状態振動を防止する。
 - Escape解除には、現在地・水平隣接セル・ジャンプ着地候補が一定時間連続して安全であることを要求する。
 - 安全確認時間はEnemyAISettingsの`Escape Safe Confirmation Time`で難易度別に調整できる。
-- 低い場所への意図的な降下は今後の拡張項目。
+- Chase／MoveToAttackPositionは局所マンハッタン評価から行動付きA*へ変更した。
+- A*のゴールはPlayerセルではなく、Bombの爆風がPlayerへ届き、AIのBombDistance内にある攻撃可能セルとする。
+- A*は通常移動、既存BlockへのJumpUp、経路中1回までのPlaceBlockAndJumpを比較し、行動列をEnemyBrainへ返す。
+- EnemyBrainは攻撃経路を保持して1手ずつ実行し、Player移動・危険化・実行失敗時だけ再探索する。
+- Chase用A*へ`MoveAndFall`を追加し、水平に踏み出した先に足場がなければ下の着地セルまでを1行動として探索する。
+- MovementComponentの`TryMoveAndFall()`が論理上の着地セルを先に確保し、水平移動後に落下表示を連続実行する。
+- 降下経路では落下列にある各セルの危険時刻も確認する。
 - Breakable/Unbreakable/配置用Block → 対応するBlockSettings
 - GridBomberGameMode → EnemyAISettings
 - BombのExplosionView → ExplosionVisualSettings

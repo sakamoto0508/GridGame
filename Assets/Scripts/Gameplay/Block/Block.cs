@@ -12,12 +12,14 @@ public enum BlockType
 /// <summary>
 /// グリッド上のブロックを表すクラス
 /// </summary>
-public class Block : MonoBehaviour
+public class Block : PooledGridObject
 {
     [SerializeField] private BlockSettings _settings;
     private GridManager _gridManager;
     private bool _isFalling;
     private bool _isDestroyed;
+    // 貸出期間ごとの世代。返却後に再開した古いAwaitableを無効化します。
+    private int _lifetimeVersion;
 
     public BlockType Type => _settings != null ? _settings.Type : BlockType.Unbreakable;
     public Vector3Int GridPosition { get; private set; }
@@ -25,15 +27,14 @@ public class Block : MonoBehaviour
     /// <summary>生成されたBlockへ論理グリッド座標を設定します。</summary>
     public void Initialize(GridManager gridManager, Vector3Int gridPosition)
     {
+        _gridManager = gridManager;
+        GridPosition = gridPosition;
         if (_settings == null)
         {
             Debug.LogError("BlockのBlock Settingsが未設定です。", this);
-            enabled = false;
+            Despawn();
             return;
         }
-
-        _gridManager = gridManager;
-        GridPosition = gridPosition;
 
         TryStartFall();
     }
@@ -58,8 +59,36 @@ public class Block : MonoBehaviour
         ReevaluateBlocksAbove(_gridManager, destroyedPosition);
 
         // TODO: 破壊時のEffectとSoundを追加する。
-        Destroy(gameObject);
+        ReturnToPool();
         return true;
+    }
+
+    /// <summary>生成失敗や明示的な削除時も、登録解除後に再利用待ちへ戻します。</summary>
+    public void Despawn()
+    {
+        if (_isDestroyed) return;
+        _isDestroyed = true;
+        if (_gridManager != null && _gridManager.TryUnregisterBlock(GridPosition, this))
+            ReevaluateBlocksAbove(_gridManager, GridPosition);
+        ReturnToPool();
+    }
+
+    internal override void ClearForPool()
+    {
+        _lifetimeVersion++;
+        if (_gridManager != null)
+            _gridManager.TryUnregisterBlock(GridPosition, this);
+        _gridManager = null;
+        _isFalling = false;
+        _isDestroyed = true;
+        GridPosition = default;
+    }
+
+    protected override void ResetForRent()
+    {
+        ClearForPool();
+        _isDestroyed = false;
+        enabled = true;
     }
 
     /// <summary>
@@ -109,11 +138,13 @@ public class Block : MonoBehaviour
         Vector3 targetWorldPosition)
     {
         _isFalling = true;
+        int lifetimeVersion = _lifetimeVersion;
         float elapsedTime = 0f;
         Vector3 startWorldPosition = transform.position;
         int nextGridYToCheck = startGridPosition.y - 1;
 
-        while (!_isDestroyed && elapsedTime < _settings.FallDuration)
+        while (this != null && lifetimeVersion == _lifetimeVersion &&
+               !_isDestroyed && elapsedTime < _settings.FallDuration)
         {
             elapsedTime += Time.deltaTime;
             float t = _settings.FallDuration <= 0f
@@ -135,13 +166,17 @@ public class Block : MonoBehaviour
                     nextGridYToCheck,
                     startGridPosition.z));
 
+                // 死亡イベントから盤面リセット等が起きた場合も古い処理を続けません。
+                if (this == null || lifetimeVersion != _lifetimeVersion || _isDestroyed)
+                    return;
+
                 nextGridYToCheck--;
             }
 
             await Awaitable.NextFrameAsync();
         }
 
-        if (_isDestroyed)
+        if (this == null || lifetimeVersion != _lifetimeVersion || _isDestroyed)
             return;
 
         // durationが0に近い場合や最終フレームの丸め誤差でも、経路全体を取りこぼさない。
@@ -151,6 +186,9 @@ public class Block : MonoBehaviour
                 startGridPosition.x,
                 nextGridYToCheck,
                 startGridPosition.z));
+
+            if (this == null || lifetimeVersion != _lifetimeVersion || _isDestroyed)
+                return;
 
             nextGridYToCheck--;
         }

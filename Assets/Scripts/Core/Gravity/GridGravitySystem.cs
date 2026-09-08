@@ -7,6 +7,45 @@ using UnityEngine;
 public static class GridGravitySystem
 {
     /// <summary>
+    /// 水平へ1セル踏み出した後、足場がなければ着地するセルまで下方向を調べます。
+    /// Character、Bomb、Blockなどで塞がれた列には降りません。
+    /// </summary>
+    public static bool TryGetStepAndFallDestination(
+        GridManager gridManager,
+        Vector3Int currentPosition,
+        Vector3Int direction,
+        out Vector3Int edgePosition,
+        out Vector3Int landingPosition)
+    {
+        edgePosition = currentPosition + direction;
+        landingPosition = edgePosition;
+
+        if (gridManager == null || !gridManager.CanCharacterEnter(edgePosition))
+            return false;
+
+        Vector3Int cursor = edgePosition;
+        while (gridManager.Contains(cursor))
+        {
+            Vector3Int below = cursor + Vector3Int.down;
+            if (!gridManager.Contains(below))
+                return false;
+
+            if (gridManager.HasBlock(below))
+            {
+                landingPosition = cursor;
+                return landingPosition.y < edgePosition.y;
+            }
+
+            if (!gridManager.CanCharacterEnter(below))
+                return false;
+
+            cursor = below;
+        }
+
+        return false;
+    }
+
+    /// <summary>
     /// Block専用の配置条件を使って、真下の着地可能セルを返します。
     /// Characterは落下を妨げず、通過時にBlock側で押し潰し判定を行います。
     /// </summary>

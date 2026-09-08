@@ -23,6 +23,12 @@ public sealed class GridDangerMap
 
     public bool IsDangerous(Vector3Int position) => _dangerTimes.ContainsKey(position);
 
+    /// <summary>
+    /// 指定したセルが何秒後に危険になるかを取得します。
+    /// </summary>
+    /// <param name="position"></param>
+    /// <param name="seconds"></param>
+    /// <returns></returns>
     public bool TryGetDangerTime(Vector3Int position, out float seconds)
         => _dangerTimes.TryGetValue(position, out seconds);
 
@@ -75,6 +81,14 @@ public sealed class GridDangerMap
         return bombs;
     }
 
+    /// <summary>
+    /// 指定した位置のBombの爆発予測を作ります。
+    /// </summary>
+    /// <param name="gridManager"></param>
+    /// <param name="position"></param>
+    /// <param name="power"></param>
+    /// <param name="time"></param>
+    /// <returns></returns>
     private static BombPrediction CreatePrediction(
         GridManager gridManager, Vector3Int position, int power, float time)
     {
@@ -111,6 +125,10 @@ public sealed class GridDangerMap
         } while (changed);
     }
 
+    /// <summary>
+    /// Bombの爆風が届くセルを危険として登録します。
+    /// </summary>
+    /// <param name="bomb"></param>
     private void RegisterDangerCells(BombPrediction bomb)
     {
         foreach (Vector3Int position in bomb.AffectedCells)
@@ -121,6 +139,12 @@ public sealed class GridDangerMap
         }
     }
 
+    /// <summary>
+    /// 指定したセルが、指定したセルのリストに含まれるかを判定します。
+    /// </summary>
+    /// <param name="cells"></param>
+    /// <param name="position"></param>
+    /// <returns></returns>
     private static bool Contains(IReadOnlyList<Vector3Int> cells, Vector3Int position)
     {
         for (int i = 0; i < cells.Count; i++)

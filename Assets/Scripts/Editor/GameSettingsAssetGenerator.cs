@@ -5,6 +5,59 @@ using UnityEngine;
 /// <summary>ジャンル別の既定Settings Assetを一括生成します。</summary>
 public static class GameSettingsAssetGenerator
 {
+
+    /// <summary>Item設定と目印付きの球形Prefabを生成します。既存Assetは上書きしません。</summary>
+    [MenuItem("Tools/3D Grid Bomber/Create Item Assets")]
+    public static void CreateItemAssets()
+    {
+        EnsureFolder("Assets/Prefabs/Item");
+        Item[] prefabs = new Item[2];
+        for (int i = 0; i < prefabs.Length; i++)
+        {
+            string name = i == 0 ? "BombPowerItem" : "BombCountItem";
+            string settingsPath = "Assets/Settings/Item/" + name + "Settings.asset";
+            bool isNew = AssetDatabase.LoadAssetAtPath<ItemSettings>(settingsPath) == null;
+            ItemSettings settings = CreateAssetIfMissing<ItemSettings>(settingsPath);
+            if (isNew)
+            {
+                SerializedObject so = new SerializedObject(settings);
+                so.FindProperty("_type").enumValueIndex = i;
+                so.ApplyModifiedPropertiesWithoutUndo();
+            }
+            string path = "Assets/Prefabs/Item/" + name + ".prefab";
+            GameObject existing = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+            if (existing != null) { prefabs[i] = existing.GetComponent<Item>(); continue; }
+            GameObject root = new GameObject(name);
+            try
+            {
+                Item item = root.AddComponent<Item>();
+                SerializedObject so = new SerializedObject(item);
+                so.FindProperty("_settings").objectReferenceValue = settings;
+                so.ApplyModifiedPropertiesWithoutUndo();
+                GameObject model = GameObject.CreatePrimitive(i == 0 ? PrimitiveType.Sphere : PrimitiveType.Cube);
+                model.transform.SetParent(root.transform, false);
+                model.transform.localScale = Vector3.one * 0.4f;
+                Object.DestroyImmediate(model.GetComponent<Collider>());
+                prefabs[i] = PrefabUtility.SaveAsPrefabAsset(root, path).GetComponent<Item>();
+            }
+            finally { Object.DestroyImmediate(root); }
+        }
+        string dropPath = "Assets/Settings/Item/ItemDropSettings.asset";
+        bool newDrop = AssetDatabase.LoadAssetAtPath<ItemDropSettings>(dropPath) == null;
+        ItemDropSettings drop = CreateAssetIfMissing<ItemDropSettings>(dropPath);
+        if (newDrop)
+        {
+            SerializedObject so = new SerializedObject(drop);
+            SerializedProperty array = so.FindProperty("_prefabs");
+            array.arraySize = prefabs.Length;
+            for (int i = 0; i < prefabs.Length; i++) array.GetArrayElementAtIndex(i).objectReferenceValue = prefabs[i];
+            so.ApplyModifiedPropertiesWithoutUndo();
+        }
+        AssetDatabase.SaveAssets();
+        Selection.activeObject = drop;
+        Debug.Log("Item Assetを生成しました。SceneのItemManagerへItemDropSettingsを設定してください。球=爆風、立方体=所持数です。");
+    }
+
     [MenuItem("Tools/3D Grid Bomber/Create Default Settings Assets")]
     public static void CreateDefaultSettingsAssets()
     {

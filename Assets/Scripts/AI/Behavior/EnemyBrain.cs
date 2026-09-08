@@ -42,6 +42,10 @@ public class EnemyBrain : MonoBehaviour
     private EnemyDifficultyValues _difficultyValues;
     private readonly GridDangerMap _dangerMap = new GridDangerMap();
     private readonly List<Vector3Int> _escapePath = new List<Vector3Int>();
+    private readonly List<GridPathStep> _attackPath = new List<GridPathStep>();
+    private Vector3Int _plannedPlayerPosition;
+    private bool _hasAttackPlan;
+    private bool _isWaitingForPlacedBlockJump;
     private Vector3Int? _previousPosition;
     private Vector3Int? _positionBeforePrevious;
     private Vector3Int? _temporarilyAvoidedCell;
@@ -135,6 +139,7 @@ public class EnemyBrain : MonoBehaviour
         // 状態にかかわらず、生存判断は常に最優先します。
         if (currentCellIsDangerous)
         {
+            ClearAttackPath();
             _escapeSafeSince = -1f;
             ResetStuckCounter(enemyPosition);
             SetState(EnemyAIState.Escape);
@@ -171,6 +176,15 @@ public class EnemyBrain : MonoBehaviour
         }
 
         Vector3Int playerPosition = _playerMovement.CurrentGridPosition;
+
+        // Block設置後の複合行動は、ほかの攻撃判断を挟まず次のジャンプまで完了させます。
+        if (_isWaitingForPlacedBlockJump)
+        {
+            SetState(EnemyAIState.MoveToAttackPosition);
+            TryFollowAttackPath(enemyPosition, playerPosition);
+            return;
+        }
+
         int distance = GetManhattanDistance(enemyPosition, playerPosition);
         bool detectedPlayer = distance <= _difficultyValues.DetectionRange;
 
@@ -183,17 +197,38 @@ public class EnemyBrain : MonoBehaviour
 
             if (TryPlaceBombByChance())
             {
+                ClearAttackPath();
                 SetState(EnemyAIState.Escape);
-                return;
             }
+
+            // すでに攻撃位置なので、確率判定に外れた回に別の攻撃位置へ移動し直しません。
+            return;
         }
 
-        if (!detectedPlayer)
-            SetState(EnemyAIState.Idle);
-        else if (HasAttackPositionCandidate(enemyPosition, playerPosition))
+        // Player検知中の追跡は、攻撃可能セルをゴールにしたA*の行動列を使います。
+        // 経路を毎回選び直さず保持するため、高低差による局所的な往復も抑えられます。
+        if (detectedPlayer)
+        {
             SetState(EnemyAIState.MoveToAttackPosition);
-        else
-            SetState(EnemyAIState.Chase);
+            if (TryFollowAttackPath(enemyPosition, playerPosition))
+                return;
+
+            // 攻撃位置への経路がない場合だけ、その場のBlockを壊すBombを検討します。
+            SetState(EnemyAIState.PlaceBomb);
+            if (TryPlaceBombByChance())
+            {
+                ClearAttackPath();
+                SetState(EnemyAIState.Escape);
+            }
+            else
+            {
+                SetState(EnemyAIState.Chase);
+            }
+            return;
+        }
+
+        ClearAttackPath();
+        SetState(EnemyAIState.Idle);
 
         List<Vector3Int> candidates = CreateDirectionCandidates(
             enemyPosition,
@@ -220,12 +255,6 @@ public class EnemyBrain : MonoBehaviour
         }
 
         // 歩行・既存Blockへのジャンプで進めない場合だけ、足場を作って上ることを検討します。
-        if (detectedPlayer && TryPlaceUsefulChaseBlock(enemyPosition, playerPosition, candidates))
-        {
-            SetState(EnemyAIState.MoveToAttackPosition);
-            return;
-        }
-
         // 全方向を塞がれている場合は、Blockを壊すきっかけとしてBomb設置を試します。
         SetState(EnemyAIState.PlaceBomb);
         if (TryPlaceBombByChance())
@@ -234,21 +263,98 @@ public class EnemyBrain : MonoBehaviour
             SetState(detectedPlayer ? EnemyAIState.Chase : EnemyAIState.Idle);
     }
 
-    /// <summary>隣接セルにPlayerへ爆風を届かせられる攻撃位置があるか調べます。</summary>
-    private bool HasAttackPositionCandidate(Vector3Int enemyPosition, Vector3Int playerPosition)
+    /// <summary>
+    /// 攻撃可能セルまでのA*経路を保持し、1回の思考につき1行動だけ実行します。
+    /// PlaceBlockAndJumpはBlock設置とジャンプの2回に分けて実行します。
+    /// </summary>
+    private bool TryFollowAttackPath(Vector3Int currentPosition, Vector3Int playerPosition)
     {
-        for (int i = 0; i < HorizontalDirections.Length; i++)
+        bool targetChanged = !_hasAttackPlan || _plannedPlayerPosition != playerPosition;
+        bool nextBecameDangerous = _attackPath.Count > 0 &&
+                                   _dangerMap.IsDangerous(_attackPath[0].Position);
+
+        if (targetChanged || nextBecameDangerous ||
+            (_attackPath.Count == 0 && !_isWaitingForPlacedBlockJump))
         {
-            Vector3Int candidate = enemyPosition + HorizontalDirections[i];
-
-            if (!_gridManager.CanCharacterEnter(candidate) || _dangerMap.IsDangerous(candidate))
-                continue;
-
-            if (CanBombHitPlayer(candidate, playerPosition))
-                return true;
+            ClearAttackPath();
+            _plannedPlayerPosition = playerPosition;
+            _hasAttackPlan = true;
+            _attackPath.AddRange(GridPathfindingSystem.FindPathToAttackPosition(
+                _gridManager,
+                _dangerMap,
+                currentPosition,
+                playerPosition,
+                _bombComponent.ExplosionPower,
+                _difficultyValues.BombDistance,
+                _movement.MoveDuration,
+                _movement.JumpDuration,
+                _movement.FallDurationPerCell,
+                _difficultyValues.ActionInterval));
         }
 
-        return false;
+        if (_attackPath.Count == 0)
+            return false;
+
+        GridPathStep step = _attackPath[0];
+
+        if (_isWaitingForPlacedBlockJump)
+        {
+            if (step.Action == GridPathActionType.PlaceBlockAndJump &&
+                _movement.TryJump(step.Direction))
+            {
+                RememberMove(currentPosition);
+                _attackPath.RemoveAt(0);
+                _isWaitingForPlacedBlockJump = false;
+                return true;
+            }
+
+            ClearAttackPath();
+            return false;
+        }
+
+        bool succeeded;
+        switch (step.Action)
+        {
+            case GridPathActionType.Move:
+                succeeded = _movement.TryMove(step.Direction);
+                break;
+
+            case GridPathActionType.JumpUp:
+                succeeded = _movement.TryJump(step.Direction);
+                break;
+
+            case GridPathActionType.MoveAndFall:
+                succeeded = _movement.TryMoveAndFall(step.Direction);
+                break;
+
+            case GridPathActionType.PlaceBlockAndJump:
+                succeeded = _movement.TryFace(step.Direction) &&
+                            _blockPlacement.TryPlaceBlock();
+                if (succeeded)
+                    _isWaitingForPlacedBlockJump = true;
+                return succeeded;
+
+            default:
+                succeeded = false;
+                break;
+        }
+
+        if (!succeeded)
+        {
+            ClearAttackPath();
+            return false;
+        }
+
+        RememberMove(currentPosition);
+        _attackPath.RemoveAt(0);
+        return true;
+    }
+
+    private void ClearAttackPath()
+    {
+        _attackPath.Clear();
+        _hasAttackPlan = false;
+        _isWaitingForPlacedBlockJump = false;
     }
 
     /// <summary>状態が変化した場合だけ更新し、遷移をConsoleへ出力します。</summary>
@@ -412,38 +518,6 @@ public class EnemyBrain : MonoBehaviour
         {
             RememberMove(currentPosition);
             return true;
-        }
-
-        return false;
-    }
-
-    /// <summary>
-    /// 通常経路がないとき、Block上へ上ることでPlayerへ近づく方向へ足場を作ります。
-    /// </summary>
-    private bool TryPlaceUsefulChaseBlock(
-        Vector3Int currentPosition,
-        Vector3Int playerPosition,
-        List<Vector3Int> orderedDirections)
-    {
-        int currentDistance = GetManhattanDistance(currentPosition, playerPosition);
-
-        for (int i = 0; i < orderedDirections.Count; i++)
-        {
-            Vector3Int direction = orderedDirections[i];
-            Vector3Int blockPosition = currentPosition + direction;
-            Vector3Int landingPosition = blockPosition + Vector3Int.up;
-            Vector3Int supportPosition = blockPosition + Vector3Int.down;
-
-            if (!_gridManager.CanPlaceBlock(blockPosition) ||
-                !_gridManager.HasBlock(supportPosition) ||
-                !_gridManager.CanCharacterEnter(landingPosition) ||
-                _dangerMap.IsDangerous(blockPosition) ||
-                _dangerMap.IsDangerous(landingPosition) ||
-                GetManhattanDistance(landingPosition, playerPosition) >= currentDistance)
-                continue;
-
-            if (_movement.TryFace(direction) && _blockPlacement.TryPlaceBlock())
-                return true;
         }
 
         return false;

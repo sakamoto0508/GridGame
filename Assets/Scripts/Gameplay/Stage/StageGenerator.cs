@@ -77,12 +77,12 @@ public class StageGenerator : MonoBehaviour
         if (!_gridManager.Contains(position) || prefab == null)
             return false;
 
-        Block block = Instantiate(prefab, _gridManager.GetWorldPosition(position),
-            Quaternion.identity, transform);
+        Block block = GridObjectPool.For(_gridManager).Rent(prefab, _gridManager.GetWorldPosition(position),
+            Quaternion.identity);
 
         if (!_gridManager.TryRegisterBlock(position, block))
         {
-            Destroy(block.gameObject);
+            block.Despawn();
             return false;
         }
 

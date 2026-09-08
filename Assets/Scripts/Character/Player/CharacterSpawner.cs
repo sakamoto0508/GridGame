@@ -1,3 +1,4 @@
+using Unity.Cinemachine;
 using UnityEngine;
 
 /// <summary>Playerを生成し、Scene固有の参照を各Componentへ注入します。</summary>
@@ -6,6 +7,7 @@ public class CharacterSpawner : MonoBehaviour
     [SerializeField] private GridManager _gridManager;
     [SerializeField] private CharacterPrefabSettings _settings;
     [SerializeField] private Camera _gameCamera;
+    [SerializeField] private CinemachineCamera _cinemaCamera;
 
     /// <summary>指定座標へPlayerを生成し、必要なScene参照を注入します。</summary>
     public PlayerCharacter SpawnPlayer(Vector3Int gridPosition)
@@ -20,7 +22,7 @@ public class CharacterSpawner : MonoBehaviour
 
         PlayerCharacter player = Instantiate(_settings.PlayerPrefab, worldPosition, Quaternion.identity);
         MovementComponent movement = player.GetComponent<MovementComponent>();
-        PlayerController controller=player.GetComponent<PlayerController>();
+        PlayerController controller = player.GetComponent<PlayerController>();
         BlockPlacementComponent blockPlacement = player.GetComponent<BlockPlacementComponent>();
         BombComponent bombComponent = player.GetComponent<BombComponent>();
 
@@ -31,8 +33,15 @@ public class CharacterSpawner : MonoBehaviour
             return null;
         }
 
+        // カメラ基準入力には実際の描画用Cameraを渡します。追従制御はCinemachine側の責務です。
+        Camera gameCamera = _gameCamera != null ? _gameCamera : Camera.main;
         if (controller != null)
-            controller.Init(_gameCamera);
+            controller.Init(gameCamera);
+
+        if (gameCamera == null)
+        {
+            Debug.LogWarning("Player用Cameraがありません。CharacterSpawnerのGame Cameraを設定してください。", this);
+        }
 
         if (blockPlacement == null)
         {
@@ -56,6 +65,10 @@ public class CharacterSpawner : MonoBehaviour
             bombComponent.Init(_gridManager, _settings.BombPrefab);
         }
 
+        if (_cinemaCamera != null)
+        {
+            _cinemaCamera.Target.TrackingTarget = player.transform;
+        }
         return player;
     }
 

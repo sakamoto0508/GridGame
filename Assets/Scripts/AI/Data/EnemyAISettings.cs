@@ -45,12 +45,9 @@ public class EnemyDifficultyValues
 [CreateAssetMenu(fileName = "EnemyAISettings", menuName = "3D Grid Bomber/Settings/Enemy AI")]
 public class EnemyAISettings : ScriptableObject
 {
-    [SerializeField] private EnemyDifficultyValues _easy =
-        new EnemyDifficultyValues(0.9f, 0.35f, 0.2f, 3, 1);
-    [SerializeField] private EnemyDifficultyValues _normal =
-        new EnemyDifficultyValues(0.55f, 0.12f, 0.4f, 6, 2);
-    [SerializeField] private EnemyDifficultyValues _hard =
-        new EnemyDifficultyValues(0.3f, 0f, 0.65f, 999, 2);
+    [SerializeField] private EnemyDifficultyValues _easy = new EnemyDifficultyValues(0.9f, 0.35f, 0.2f, 3, 1);
+    [SerializeField] private EnemyDifficultyValues _normal = new EnemyDifficultyValues(0.55f, 0.12f, 0.4f, 6, 2);
+    [SerializeField] private EnemyDifficultyValues _hard = new EnemyDifficultyValues(0.3f, 0f, 0.65f, 999, 2);
 
     public EnemyDifficultyValues Easy => _easy;
     public EnemyDifficultyValues Normal => _normal;

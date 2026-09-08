@@ -93,6 +93,8 @@ public static class ExplosionSystem
             Block block = gridManager.GetBlock(position);
             CharacterBase character = gridManager.GetCharacter(position);
             Bomb bomb = gridManager.GetBomb(position);
+            // 爆風に含まれるItemは取得されず消滅します。
+            gridManager.GetItem(position)?.Despawn();
 
             if (bomb != null && bomb.State != BombState.Exploded)
                 chainedBombs.Add(bomb);

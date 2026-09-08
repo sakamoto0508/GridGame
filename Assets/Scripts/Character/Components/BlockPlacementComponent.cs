@@ -86,16 +86,16 @@ public class BlockPlacementComponent : MonoBehaviour
             return false;
         }
 
-        Block block = Instantiate(
+        Block block = GridObjectPool.For(_gridManager).Rent(
             _blockPrefab,
             _gridManager.GetWorldPosition(targetPosition),
             Quaternion.identity);
 
         if (!_gridManager.TryRegisterBlock(targetPosition, block))
         {
-            Destroy(block.gameObject);
+            block.Despawn();
             Debug.LogWarning(
-                $"Blockを生成しましたが、セル {targetPosition} への登録に失敗したため破棄しました。",
+                $"Blockを取得しましたが、セル {targetPosition} への登録に失敗したためプールへ返却しました。",
                 this);
             return false;
         }

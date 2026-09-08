@@ -73,14 +73,16 @@ public class Bomb : MonoBehaviour
         GridManager gridManager,
         Vector3Int gridPosition,
         CharacterBase owner,
-        BombSettings settings)
+        BombSettings settings,
+        int? explosionPower = null)
     {
         _gridManager = gridManager;
         _settings = settings;
         GridPosition = gridPosition;
         Owner = owner;
         _remainingFuseTime = Mathf.Max(0f, _settings.FuseTime);
-        ExplosionPower = Mathf.Max(1, _settings.ExplosionPower);
+        // 設置時点の性能を固定し、後からItemを取っても既存Bombは強化しません。
+        ExplosionPower = Mathf.Max(1, explosionPower ?? _settings.ExplosionPower);
         State = BombState.Armed;
         _isInitialized = true;
 
