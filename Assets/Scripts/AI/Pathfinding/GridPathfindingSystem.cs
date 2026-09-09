@@ -26,7 +26,7 @@ public readonly struct GridPathStep
 }
 
 /// <summary>
-/// Enemyの逃走経路は幅優先探索（BFS）、Playerへの攻撃位置まではA*で計算します。
+/// Enemyの逃走経路は幅優先探索（BFS）、攻撃位置まではA*、Item取得はDijkstra法で計算します。
 ///
 /// このクラス自身はCharacterを動かしません。GridManagerへ移動可能性を問い合わせ、
 /// GridDangerMapへ爆発時刻を問い合わせたうえで、通過するセルの一覧だけを返します。
@@ -59,6 +59,87 @@ public static class GridPathfindingSystem
         public float ArrivalTime;
         public AttackNode Parent;
         public GridPathStep Step;
+    }
+
+    /// <summary>
+    /// Itemのセルまでの最短所要時間経路をDijkstra法で探索します（ヒューリスティックなし）。
+    /// 歩行・段差ジャンプ・降下だけを使用し、地形を変更しません。
+    /// 攻撃/逃走と違い、爆発前に通過できても予測危険セルへは寄り道しない方針です。
+    /// </summary>
+    public static List<GridPathStep> FindSafePathToItem(
+        GridManager grid, GridDangerMap danger, Vector3Int start, Vector3Int goal,
+        float moveDuration, float jumpDuration, float fallDuration, float interval,
+        out float totalTime)
+    {
+        totalTime = float.PositiveInfinity;
+        var empty = new List<GridPathStep>();
+        if (grid == null || danger == null || !grid.Contains(start) || !grid.Contains(goal) ||
+            danger.IsDangerous(start) || danger.IsDangerous(goal)) return empty;
+        var open = new List<AttackNode> { new AttackNode { Position = start } };
+        var costs = new Dictionary<Vector3Int, float> { [start] = 0f };
+        while (open.Count > 0)
+        {
+            int best = 0;
+            for (int i = 1; i < open.Count; i++) if (open[i].Cost < open[best].Cost) best = i;
+            AttackNode node = open[best];
+            open.RemoveAt(best);
+            if (node.Cost > costs[node.Position]) continue;
+            if (node.Position == goal)
+            {
+                totalTime = node.Cost;
+                return BuildAttackPath(node);
+            }
+            foreach (Vector3Int direction in HorizontalDirections)
+            {
+                TryAdd(new GridPathStep(node.Position + direction, direction, GridPathActionType.Move));
+                TryAdd(new GridPathStep(node.Position + direction + Vector3Int.up, direction, GridPathActionType.JumpUp));
+                if (GridGravitySystem.TryGetStepAndFallDestination(grid, node.Position, direction, out _, out Vector3Int landing))
+                    TryAdd(new GridPathStep(landing, direction, GridPathActionType.MoveAndFall));
+            }
+
+            void TryAdd(GridPathStep step)
+            {
+                if (!IsSafeItemStep(grid, danger, node.Position, step, moveDuration, jumpDuration,
+                        fallDuration, interval, node.Cost, out float duration)) return;
+                float cost = node.Cost + duration;
+                if (costs.TryGetValue(step.Position, out float old) && old <= cost) return;
+                costs[step.Position] = cost;
+                open.Add(new AttackNode { Position = step.Position, Cost = cost, Parent = node, Step = step });
+            }
+        }
+        return empty;
+    }
+
+    /// <summary>保持した取得経路の再検証にも同じ判定を使い、探索と実行の条件を揃えます。</summary>
+    public static bool IsSafeItemStep(GridManager grid, GridDangerMap danger, Vector3Int from,
+        GridPathStep step, float moveDuration, float jumpDuration, float fallDuration,
+        float interval, float elapsed, out float duration)
+    {
+        duration = Mathf.Max(moveDuration, interval);
+        if (danger.IsDangerous(from) || danger.IsDangerous(step.Position)) return false;
+        Vector3Int direction = step.Direction;
+        if (direction.y != 0 || Mathf.Abs(direction.x) + Mathf.Abs(direction.z) != 1) return false;
+        switch (step.Action)
+        {
+            case GridPathActionType.Move:
+                if (step.Position != from + direction || !CanStandAt(grid, step.Position)) return false;
+                break;
+            case GridPathActionType.JumpUp:
+                duration = Mathf.Max(jumpDuration, interval);
+                if (!grid.CanJumpUp(from, direction, out Vector3Int up) || up != step.Position ||
+                    !grid.CanCharacterEnter(up) || !grid.CanCharacterEnter(from + Vector3Int.up) ||
+                    danger.IsDangerous(from + Vector3Int.up)) return false;
+                break;
+            case GridPathActionType.MoveAndFall:
+                if (!GridGravitySystem.TryGetStepAndFallDestination(grid, from, direction,
+                        out Vector3Int edge, out Vector3Int down) || down != step.Position) return false;
+                duration += fallDuration * (edge.y - down.y);
+                for (int y = edge.y; y >= down.y; y--)
+                    if (danger.IsDangerous(new Vector3Int(edge.x, y, edge.z))) return false;
+                break;
+            default: return false;
+        }
+        return CanArriveBeforeExplosion(danger, step.Position, elapsed + duration, interval);
     }
 
     // UnityではYが高さです。この配列には高さを変えないX/Z方向だけを定義します。

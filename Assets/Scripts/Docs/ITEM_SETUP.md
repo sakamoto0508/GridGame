@@ -18,7 +18,7 @@
 - 爆風または後から同じセルに入ったBlockで消滅。登録解除は二重実行に耐える。
 - 取得効果は通常+1、種類ごとにボーナス上限8。上限時も消費する。
 - 爆風距離は設置時点でBombへコピーする。設置済みBombは後から強化されない。
-- AIの仮想Bomb予測もBombComponentの強化済み性能を使う。Enemyも接触取得するが、Itemを狙うCollectItem行動はまだ未実装。
+- AIの仮想Bomb予測もBombComponentの強化済み性能を使う。Enemyは安全な着地済みItemを狙うCollectItem行動に対応。詳細は`ENEMY_ITEM_AI.md`。
 - 移動速度・貫通・能力HUDは次の段階。
 
 ## Play Mode確認

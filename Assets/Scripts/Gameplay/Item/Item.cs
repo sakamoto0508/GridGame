@@ -7,6 +7,10 @@ public class Item : PooledGridObject
     private GridManager _gridManager;
     public Vector3Int GridPosition { get; private set; }
     public bool IsFalling { get; private set; }
+    // 同じプール個体でも再出現したItemは別の取得目標として扱います。
+    public int SpawnVersion { get; private set; }
+    public ItemSettings Settings => _settings;
+    public bool IsAvailable => _initialized && !_removed && isActiveAndEnabled;
     private bool _initialized;
     private bool _removed;
     private Vector3 _fallStart;
@@ -24,6 +28,7 @@ public class Item : PooledGridObject
         GridPosition = position;
         transform.position = grid.GetWorldPosition(position);
         _initialized = true;
+        SpawnVersion++;
         return true;
     }
 

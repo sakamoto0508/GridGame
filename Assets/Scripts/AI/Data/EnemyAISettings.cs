@@ -14,6 +14,11 @@ public class EnemyDifficultyValues
     [SerializeField, Min(2)] private int _maxSameCellDecisions = 3;
     [SerializeField, Min(0.05f)] private float _reconsiderPause = 0.6f;
     [SerializeField, Min(0.05f)] private float _escapeSafeConfirmationTime = 0.6f;
+    [Header("Item Collection")]
+    [SerializeField] private bool _collectItems = true;
+    [SerializeField, Min(0.05f)] private float _itemSearchInterval = 0.8f;
+    [SerializeField, Min(0.05f)] private float _itemRetryDelay = 2f;
+    [SerializeField, Min(0.1f)] private float _itemPlanTimeout = 10f;
 
     public float ActionInterval => _actionInterval;
     public float MistakeChance => _mistakeChance;
@@ -23,6 +28,10 @@ public class EnemyDifficultyValues
     public int MaxSameCellDecisions => Mathf.Max(2, _maxSameCellDecisions);
     public float ReconsiderPause => Mathf.Max(0.05f, _reconsiderPause);
     public float EscapeSafeConfirmationTime => Mathf.Max(0.05f, _escapeSafeConfirmationTime);
+    public bool CollectItems => _collectItems;
+    public float ItemSearchInterval => Mathf.Max(0.05f, _itemSearchInterval);
+    public float ItemRetryDelay => Mathf.Max(0.05f, _itemRetryDelay);
+    public float ItemPlanTimeout => Mathf.Max(0.1f, _itemPlanTimeout);
 
     public EnemyDifficultyValues() { }
 

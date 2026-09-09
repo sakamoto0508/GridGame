@@ -8,12 +8,13 @@ public enum EnemyAIState
     Chase,
     MoveToAttackPosition,
     PlaceBomb,
-    Escape
+    Escape,
+    CollectItem
 }
 
 /// <summary>
-/// Playerへの簡易接近、徘徊、Bomb設置を行う最小構成のEnemy AIです。
-/// 経路探索と爆風回避は後からGridPathfindingSystemとGridDangerMapで追加します。
+/// 危険回避、Item取得、Playerへの接近・攻撃を優先順に判断します。
+/// 経路探索はGridPathfindingSystem、爆発予測はGridDangerMapへ委譲します。
 /// </summary>
 [RequireComponent(typeof(EnemyCharacter))]
 [RequireComponent(typeof(MovementComponent))]
@@ -57,6 +58,12 @@ public class EnemyBrain : MonoBehaviour
     private float _escapeSafeSince = -1f;
     private float _nextActionTime;
     private bool _isInitialized;
+    private Item _itemTarget;
+    private int _itemTargetVersion;
+    private Vector3Int _itemTargetPosition;
+    private readonly List<GridPathStep> _itemPath = new();
+    private float _itemPlanUntil;
+    private float _nextItemSearch;
 
     [Header("Debug")]
     [SerializeField] private EnemyAIState _currentState = EnemyAIState.Idle;
@@ -118,10 +125,6 @@ public class EnemyBrain : MonoBehaviour
         if (_movement.IsBusy || Time.time < _nextActionTime)
             return;
 
-        // 同じ判断を繰り返した直後は、短時間待って盤面やPlayerの変化を待ちます。
-        if (Time.time < _reconsiderUntil)
-            return;
-
         _nextActionTime = Time.time + _difficultyValues.ActionInterval;
         ThinkAndAct();
     }
@@ -139,6 +142,7 @@ public class EnemyBrain : MonoBehaviour
         // 状態にかかわらず、生存判断は常に最優先します。
         if (currentCellIsDangerous)
         {
+            ClearItemPlan(true);
             ClearAttackPath();
             _escapeSafeSince = -1f;
             ResetStuckCounter(enemyPosition);
@@ -158,6 +162,9 @@ public class EnemyBrain : MonoBehaviour
         }
 
         _escapeSafeSince = -1f;
+
+        // 行き詰まり後の待機中でも上の危険判定は実行し、爆風回避を止めません。
+        if (Time.time < _reconsiderUntil) return;
 
         // 移動せず同じセルで判断し続けた場合、通常ロジックを繰り返さず別方向を試します。
         if (RegisterDecisionAndIsStuck(enemyPosition))
@@ -184,6 +191,9 @@ public class EnemyBrain : MonoBehaviour
             TryFollowAttackPath(enemyPosition, playerPosition);
             return;
         }
+
+        // 逃走と実行中の設置→ジャンプの完了後に、安全なItem取得を攻撃より優先します。
+        if (TryCollectItem(enemyPosition)) return;
 
         int distance = GetManhattanDistance(enemyPosition, playerPosition);
         bool detectedPlayer = distance <= _difficultyValues.DetectionRange;
@@ -355,6 +365,122 @@ public class EnemyBrain : MonoBehaviour
         _attackPath.Clear();
         _hasAttackPlan = false;
         _isWaitingForPlacedBlockJump = false;
+    }
+
+    /// <summary>有効な目標は固定し、新しく近いItemが現れても途中で目標を変えません。</summary>
+    private bool TryCollectItem(Vector3Int current)
+    {
+        if (!_difficultyValues.CollectItems)
+        {
+            ClearItemPlan(false);
+            return false;
+        }
+        if (_itemTarget != null &&
+            (_itemTarget.SpawnVersion != _itemTargetVersion ||
+             _itemTarget.GridPosition != _itemTargetPosition || !CanTargetItem(_itemTarget) ||
+             Time.time >= _itemPlanUntil))
+        {
+            ClearItemPlan(true);
+            return false;
+        }
+
+        if (_itemTarget == null)
+        {
+            _itemPath.Clear();
+            if (Time.time < _nextItemSearch) return false;
+            _nextItemSearch = Time.time + _difficultyValues.ItemSearchInterval;
+            float bestTime = float.PositiveInfinity;
+            Vector3Int size = _gridManager.Size;
+            for (int x = 0; x < size.x; x++)
+            for (int y = 0; y < size.y; y++)
+            for (int z = 0; z < size.z; z++)
+            {
+                Vector3Int position = new Vector3Int(x, y, z);
+                if (GetManhattanDistance(current, position) > _difficultyValues.DetectionRange) continue;
+                Item item = _gridManager.GetItem(position);
+                if (!CanTargetItem(item)) continue;
+                List<GridPathStep> path = GridPathfindingSystem.FindSafePathToItem(
+                    _gridManager, _dangerMap, current, position, _movement.MoveDuration,
+                    _movement.JumpDuration, _movement.FallDurationPerCell,
+                    _difficultyValues.ActionInterval, out float travelTime);
+                if (travelTime >= bestTime || travelTime > _difficultyValues.ItemPlanTimeout ||
+                    (path.Count == 0 && position != current)) continue;
+                bestTime = travelTime;
+                _itemTarget = item;
+                _itemTargetVersion = item.SpawnVersion;
+                _itemTargetPosition = position;
+                _itemPath.Clear();
+                _itemPath.AddRange(path);
+            }
+            if (_itemTarget == null) return false;
+            _itemPlanUntil = Time.time + _difficultyValues.ItemPlanTimeout;
+            ClearAttackPath();
+        }
+
+        if (current == _itemTargetPosition)
+        {
+            bool collected = _itemTarget.TryCollect(_enemy);
+            ClearItemPlan(!collected);
+            if (collected) SetState(EnemyAIState.CollectItem);
+            return collected;
+        }
+        while (_itemPath.Count > 0 && _itemPath[0].Position == current) _itemPath.RemoveAt(0);
+
+        // 毎思考で残り経路を再検証。移動先だけでなく途中の降下列や足場の変化も確認します。
+        Vector3Int cursor = current;
+        float arrival = 0f;
+        foreach (GridPathStep step in _itemPath)
+        {
+            if (!GridPathfindingSystem.IsSafeItemStep(_gridManager, _dangerMap, cursor, step,
+                    _movement.MoveDuration, _movement.JumpDuration, _movement.FallDurationPerCell,
+                    _difficultyValues.ActionInterval, arrival, out float duration))
+            {
+                ClearItemPlan(true);
+                return false;
+            }
+            cursor = step.Position;
+            arrival += duration;
+        }
+        if (_itemPath.Count == 0)
+        {
+            ClearItemPlan(true);
+            return false;
+        }
+
+        GridPathStep next = _itemPath[0];
+        bool moved = next.Action == GridPathActionType.Move ? _movement.TryMove(next.Direction) :
+            next.Action == GridPathActionType.JumpUp ? _movement.TryJump(next.Direction) :
+            next.Action == GridPathActionType.MoveAndFall && _movement.TryMoveAndFall(next.Direction);
+        if (!moved)
+        {
+            ClearItemPlan(true);
+            return false;
+        }
+        SetState(EnemyAIState.CollectItem);
+        RememberMove(current);
+        return true;
+    }
+
+    /// <summary>着地済み・取得による強化あり・危険予測なしのItemだけを対象にします。</summary>
+    private bool CanTargetItem(Item item)
+    {
+        if (item == null || !item.IsAvailable || item.IsFalling || item.Settings == null ||
+            _gridManager.GetItem(item.GridPosition) != item ||
+            !_gridManager.HasBlock(item.GridPosition + Vector3Int.down) ||
+            _dangerMap.IsDangerous(item.GridPosition)) return false;
+        InventoryComponent inventory = _enemy.GetComponent<InventoryComponent>();
+        int bonus = inventory == null ? 0 : item.Settings.Type == ItemType.BombPower ?
+            inventory.BombPowerBonus : inventory.BombCountBonus;
+        // 上限品は消費する目的で追わず、強化できるItemを優先します。
+        return bonus < item.Settings.MaxBonus;
+    }
+
+    private void ClearItemPlan(bool retryDelay)
+    {
+        _itemTarget = null;
+        _itemPath.Clear();
+        if (retryDelay)
+            _nextItemSearch = Time.time + _difficultyValues.ItemRetryDelay;
     }
 
     /// <summary>状態が変化した場合だけ更新し、遷移をConsoleへ出力します。</summary>
@@ -632,6 +758,7 @@ public class EnemyBrain : MonoBehaviour
     /// </summary>
     private void RecoverFromStuck(Vector3Int currentPosition)
     {
+        ClearItemPlan(true);
         SetState(EnemyAIState.Idle);
         _escapePath.Clear();
 
