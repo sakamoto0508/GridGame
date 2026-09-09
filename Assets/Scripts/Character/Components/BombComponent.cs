@@ -5,8 +5,12 @@ using UnityEngine;
 /// Player入力とEnemy AIの両方から利用できます。
 /// </summary>
 [RequireComponent(typeof(MovementComponent))]
+[RequireComponent(typeof(InventoryComponent))]
 public class BombComponent : MonoBehaviour
 {
+    /// <summary>設置数・アイテム強化による能力が変わったときの通知です。</summary>
+    public event System.Action StatsChanged;
+    private InventoryComponent _inventory;
     /// <summary>現在盤面に残っている、このCharacterのBomb数です。</summary>
     public int CurrentBombCount => _currentBombCount;
 
@@ -31,6 +35,10 @@ public class BombComponent : MonoBehaviour
     {
         _movement = GetComponent<MovementComponent>();
         _owner = GetComponent<CharacterBase>();
+        // 既存PrefabにもInventoryを補完し、初回Item取得前から通知を購読します。
+        _inventory = GetComponent<InventoryComponent>();
+        if (_inventory == null) _inventory = gameObject.AddComponent<InventoryComponent>();
+        _inventory.Changed += NotifyStatsChanged;
     }
 
     /// <summary>SpawnerからGridManagerと設置用Bomb Prefabを受け取ります。</summary>
@@ -90,6 +98,7 @@ public class BombComponent : MonoBehaviour
         _currentBombCount++;
         bomb.Exploded += HandleBombExploded;
         bomb.Init(_gridManager, position, _owner, _settings, ExplosionPower);
+        NotifyStatsChanged();
         return true;
     }
 
@@ -98,5 +107,13 @@ public class BombComponent : MonoBehaviour
     {
         bomb.Exploded -= HandleBombExploded;
         _currentBombCount = Mathf.Max(0, _currentBombCount - 1);
+        NotifyStatsChanged();
+    }
+
+    private void NotifyStatsChanged() => StatsChanged?.Invoke();
+
+    private void OnDestroy()
+    {
+        if (_inventory != null) _inventory.Changed -= NotifyStatsChanged;
     }
 }

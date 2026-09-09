@@ -1,11 +1,10 @@
 using TMPro;
 using UnityEngine;
-using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 /// <summary>
-/// 試合中の生存人数と終了結果を表示し、現在Sceneのリスタートを受け付けます。
-/// ゲームルールは持たず、GridBomberGameStateの通知だけを表示へ反映します。
+/// 生存人数・Playerの能力/座標・終了結果を表示し、Sceneのリスタートを受け付けます。
+/// ゲームルールは持たず、試合通知とPlayerの状態を表示へ反映します。
 /// </summary>
 public class GameHud : MonoBehaviour
 {
@@ -15,28 +14,117 @@ public class GameHud : MonoBehaviour
 
     [Header("Playing UI")]
     [SerializeField] private TMP_Text _aliveCountText;
+    [Tooltip("Sceneに配置したTMP Textを指定してください。UIは自動生成しません。")]
+    [SerializeField] private TMP_Text _playerStatusText;
 
     [Header("Result UI")]
     [SerializeField] private GameObject _resultPanel;
     [SerializeField] private CanvasGroup _resultCanvasGroup;
     [SerializeField] private TMP_Text _resultText;
     [SerializeField] private Button _restartButton;
+    [SerializeField] private Button _returnToSetupButton;
+    [SerializeField] private GridBomberGameMode _gameMode;
 
     private int _resultSequenceVersion;
+    private PlayerCharacter _player;
+    private BombComponent _playerBombs;
+    private MovementComponent _playerMovement;
+    private int _lastPower = -1;
+    private int _lastLimit = -1;
+    private int _lastPlaced = -1;
+    private Vector3Int _lastPosition;
+    private string _lastStatusFormat;
+    private bool _statusValid;
+    private GameHudSettings _runtimeSettings;
 
     private void Awake()
     {
         if (_settings == null)
-            Debug.LogError("GameHudのGame HUD Settingsが未設定です。", this);
+        {
+            Debug.LogWarning("GameHudのSettingsが未設定のため既定値を使用します。", this);
+            _runtimeSettings = ScriptableObject.CreateInstance<GameHudSettings>();
+            _settings = _runtimeSettings;
+        }
 
         PrepareResultCanvasGroup();
+        if (_playerStatusText == null)
+            Debug.LogWarning("GameHudのPlayer Status Textに、SceneのTMP Textを設定してください。", this);
         HideResult();
 
         UpdateAliveCount(_gameState != null ? _gameState.AliveCharacterCount : 0);
     }
 
+    /// <summary>GameModeが生成したPlayerを渡します。Enemyを誤って表示対象にしません。</summary>
+    public void BindPlayer(PlayerCharacter player)
+    {
+        UnsubscribePlayer();
+        _player = player;
+        _playerBombs = player != null ? player.GetComponent<BombComponent>() : null;
+        _playerMovement = player != null ? player.GetComponent<MovementComponent>() : null;
+        _statusValid = false;
+        if (isActiveAndEnabled) SubscribePlayer();
+        RefreshPlayerStatus();
+    }
+
+    private void SubscribePlayer()
+    {
+        // BindとOnEnableの両方から呼ばれても二重購読しません。
+        UnsubscribePlayer();
+        if (_playerBombs != null) _playerBombs.StatsChanged += RefreshPlayerStatus;
+        if (_playerMovement != null) _playerMovement.GridPositionChanged += RefreshPlayerStatus;
+    }
+
+    private void UnsubscribePlayer()
+    {
+        if (_playerBombs != null) _playerBombs.StatsChanged -= RefreshPlayerStatus;
+        if (_playerMovement != null) _playerMovement.GridPositionChanged -= RefreshPlayerStatus;
+    }
+
+    /// <summary>値を比較し、変化したときだけ文字列を更新。死亡後も最後の座標と残存Bomb数を表示します。</summary>
+    private void RefreshPlayerStatus()
+    {
+        if (_playerStatusText == null) return;
+        if (_player == null || _playerBombs == null || _playerMovement == null)
+        {
+            if (_statusValid || _playerStatusText.text != string.Empty) _playerStatusText.text = string.Empty;
+            _statusValid = false;
+            return;
+        }
+        int power = _playerBombs.ExplosionPower;
+        int limit = _playerBombs.MaxBombCount;
+        int placed = _playerBombs.CurrentBombCount;
+        Vector3Int position = _playerMovement.CurrentGridPosition;
+        string format = _settings.PlayerStatusFormat ?? string.Empty;
+        if (_statusValid && power == _lastPower && limit == _lastLimit && placed == _lastPlaced &&
+            position == _lastPosition && format == _lastStatusFormat) return;
+        _lastPower = power;
+        _lastLimit = limit;
+        _lastPlaced = placed;
+        _lastPosition = position;
+        _lastStatusFormat = format;
+        _statusValid = true;
+        try
+        {
+            _playerStatusText.text = string.Format(format, power, limit, placed, position.x, position.y, position.z);
+        }
+        catch (System.FormatException)
+        {
+            Debug.LogWarning("Player Status Formatの書式が不正です。{0}～{5}を使用してください。", this);
+            _playerStatusText.text = $"RANGE: {power}\nBOMB LIMIT: {limit}\nBOMBS PLACED: {placed}\nGRID: {position}";
+        }
+    }
+
+    private void OnDestroy()
+    {
+        UnsubscribePlayer();
+        if (_runtimeSettings != null) Destroy(_runtimeSettings);
+    }
+
     private void OnEnable()
     {
+        SubscribePlayer();
+        _statusValid = false;
+        RefreshPlayerStatus();
         if (_gameState != null)
         {
             _gameState.StateChanged += HandleStateChanged;
@@ -50,10 +138,13 @@ public class GameHud : MonoBehaviour
 
         if (_restartButton != null)
             _restartButton.onClick.AddListener(RestartGame);
+        if (_returnToSetupButton != null)
+            _returnToSetupButton.onClick.AddListener(ReturnToSetup);
     }
 
     private void OnDisable()
     {
+        UnsubscribePlayer();
         // 待機中またはフェード中の非同期処理を無効化します。
         _resultSequenceVersion++;
 
@@ -66,6 +157,8 @@ public class GameHud : MonoBehaviour
 
         if (_restartButton != null)
             _restartButton.onClick.RemoveListener(RestartGame);
+        if (_returnToSetupButton != null)
+            _returnToSetupButton.onClick.RemoveListener(ReturnToSetup);
     }
 
     /// <summary>現在の生存Character数を表示します。</summary>
@@ -168,7 +261,7 @@ public class GameHud : MonoBehaviour
             _resultPanel.SetActive(false);
     }
 
-    /// <summary>CanvasGroupが未設定ならResult Panelから取得または自動追加します。</summary>
+    /// <summary>CanvasGroupが未指定なら配置済みのものを取得します。自動追加はしません。</summary>
     private void PrepareResultCanvasGroup()
     {
         if (_resultCanvasGroup != null || _resultPanel == null)
@@ -177,7 +270,7 @@ public class GameHud : MonoBehaviour
         _resultCanvasGroup = _resultPanel.GetComponent<CanvasGroup>();
 
         if (_resultCanvasGroup == null)
-            _resultCanvasGroup = _resultPanel.AddComponent<CanvasGroup>();
+            Debug.LogWarning("Result PanelにCanvasGroupを追加し、GameHudへ設定してください。", this);
     }
 
     /// <summary>現在の非同期表示処理がまだ有効か確認します。</summary>
@@ -199,14 +292,15 @@ public class GameHud : MonoBehaviour
     /// <summary>現在開いているSceneを読み込み直して試合を最初から開始します。</summary>
     public void RestartGame()
     {
-        Scene activeScene = SceneManager.GetActiveScene();
+        Reload(true);
+    }
 
-        if (!activeScene.IsValid())
-        {
-            Debug.LogError("現在Sceneを取得できないため、リスタートできません。", this);
-            return;
-        }
+    public void ReturnToSetup() => Reload(false);
 
-        SceneManager.LoadScene(activeScene.name);
+    private void Reload(bool autoStart)
+    {
+        if (_gameMode == null) _gameMode = FindFirstObjectByType<GridBomberGameMode>();
+        if (_gameMode != null) _gameMode.ReloadMatch(autoStart);
+        else Debug.LogWarning("再読込にはGameModeを指定してください。", this);
     }
 }

@@ -1,0 +1,21 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e21ba632411e58c43b61ef291ad0a7e5, type: 3}
+  m_Name: EndPhaseSettings
+  m_EditorClassIdentifier: Assembly-CSharp::EndPhaseSettings
+  _enabled: 1
+  _startAfterSeconds: 60
+  _warningSeconds: 2
+  _dropInterval: 3
+  _blockPrefab: {fileID: 0}
+  _warningColor: {r: 1, g: 0.15, b: 0.05, a: 1}
+  _lineWidthInCells: 0.06

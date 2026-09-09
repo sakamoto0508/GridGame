@@ -219,6 +219,9 @@ public class GridManager : MonoBehaviour
     /// 落下中のBlockが指定セルを通過できるか判定します。
     /// Characterは押し潰す対象なので、Blockの落下を妨げません。
     /// </summary>
+    public bool TryRegisterFallingBlock(Vector3Int position, Block block)
+        => CanFallingBlockEnter(position) && GetCell(position).TrySetBlock(block);
+
     public bool CanFallingBlockEnter(Vector3Int position)
     {
         GridCell cell = GetCell(position);

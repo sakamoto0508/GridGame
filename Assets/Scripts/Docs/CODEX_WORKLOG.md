@@ -1,6 +1,47 @@
 # 3D Grid Bomber — Codex作業ログ兼仕様書
 
-最終更新: 2026-09-09
+最終更新: 2026-09-10
+
+## 試合設定画面（2026-09-10）
+
+- GameModeの起動時自動開始を廃止。公開StartMatch(difficulty)で選択難易度を受け取り、1回だけ生成する。通常起動はWaiting。
+- MatchSetupUI/MatchSetupSettings追加。事前配置したTMP Dropdown（Easy/Normal/Hard）、開始Button、操作説明/エラーText、設定/プレイPanelをInspectorで参照。ボタン・選択変更・試合状態をイベント購読する。
+- GameHudに設定へ戻るButtonを追加。再戦は同難易度でScene再読込→即開始、設定復帰はScene再読込→Waiting。MatchLaunchRequestが一度きりの引継ぎを保持し、Play開始時にクリアする。SOは書き換えない。
+- C#ビルドは警告/エラー0。Scene UIは未配置・未接続。`Docs/MATCH_SETUP_UI.md`に階層/接続/試験手順を記載。UIを配置するまでは自動開始しない点に注意。
+
+## HUDのイベント化・事前配置方針（2026-09-10）
+
+- UIは原則Scene/Prefabに事前配置しInspectorから参照する方針に変更。GameHudのPanel/TMP動的生成と結果CanvasGroupの自動追加を削除。Player Status TextとResult PanelのCanvasGroupをUnityで用意すること（Scene未変更）。
+- GameHud.LateUpdateを削除。BombComponent.StatsChangedとMovementComponent.GridPositionChanged（event System.Action）で表示を更新。Bind/OnEnableで購読と初期反映、再Bind/OnDisable/OnDestroyで解除する。
+- BombComponentは設置・爆発後に通知し、InventoryComponent.Changedも中継する。既存PrefabでInventoryがない場合はBombComponentがAwakeで補完し、初回取得の通知を取りこぼさない。
+- Movementの全座標更新をSetGridPositionへ統一。移動・ジャンプ・落下で実際に論理座標が変わった場合のみ通知。
+- GameHudSettingsから自動レイアウト用の位置/サイズ/色/余白を削除。表示書式と結果演出時間はSO、レイアウトや文字色・サイズはScene内のRectTransform/TMP/Imageで調整する。
+- 検証項目: Item取得・Bomb設置/連鎖爆発・段差移動の表示、HUD無効化中の変化が再有効化時に反映されること、二重購読がないこと。Play Modeは未確認。
+
+## Player能力・座標HUD（2026-09-10）
+
+- GameModeが生成したPlayerをGameHud.BindPlayerへ注入。Game Hud未指定時はSceneのGameHudを検索。
+- 爆風距離(ExplosionPower)、同時設置上限(MaxBombCount)、現在の設置数(CurrentBombCount)、グリッド座標(CurrentGridPosition)を表示。値が変わった場合だけ文字列を更新し、アイテム効果・設置・爆発・移動を反映。
+- Player Status Text未指定時は既存Canvas右上に半透明のパネルとTMPテキストを生成。レイキャストは無効、結果UIの背面。既存の生存人数・結果フェードは維持。
+- GameHudSettingsのPlayer Statusで文言/サイズ/位置/文字色/背景色/余白を設定。書式は{0}=射程、{1}=上限、{2}=設置中、{3}/{4}/{5}=X/Y/Z。既定はフォント互換性を考慮した英語表記。
+- 座標は表示Transformではなく論理セル。移動開始時に先のセルへ切り替わる場合がある。死亡後も最終座標と残存Bomb数を参照する。表示対象が破棄されたら空欄にする。
+- C#コンパイル成功（警告/エラー0）。Play Modeで初期値、Item取得後の増加、設置/連鎖爆発後のカウント、移動/ジャンプ/落下の座標、死亡/リスタートを確認すること。画面での配置・読みやすさは未確認。
+
+## 天井Spot Light（2026-09-10）
+
+- StageGeneratorがStageLightingControllerを追加し、LightingRoot配下に天井内側から下向きのSpot Lightを生成。既定2×2灯・影なし。既存Directional Lightは変更していない。
+- Block Prefabや天井Rendererとは別管理なので、落下BlockにLightが付いたり、天井非表示で照明が消えることはない。
+- StageLightingSettingsで有効/無効・灯数・色・強度・角度・天井からの距離・照射距離・影を調整。Create > 3D Grid Bomber > Settings > Stage Lightingから生成し、StageGeneratorのLighting Settingsへ指定。既定Settings生成メニューにも追加。
+- フィールド寸法に合わせた等間隔配置。再生成時は既存灯を再利用。実行中にSOを調整した場合はControllerのContext Menu > Refresh Lightingで反映できる。
+- Play Modeで明るさ、4方向からの段差視認性、影の負荷を確認すること。次の候補は現在の爆風距離/同時設置数を表示する能力HUD。
+
+## 終盤落下イベント（2026-09-09）
+
+- EndPhaseSettings/EndPhaseManager追加。GameModeからGridManagerへ自動初期化。既定60秒開始→2秒の列予告→破壊不可Block落下→着地後3秒待機。
+- 天井内側の最上段へプールから生成。予告中のBlock/Bomb/予約による生成位置の閉塞はキャンセル。最上段Characterの押し潰しも追加。
+- GridDangerMapに予告/落下列の危険情報を合流。仮想Bombによる逃走確認にも反映。全高を生成時刻から危険扱いする保守的な予測。
+- 試合終了・無効化で予告を消去し、生成中/落下中のイベントBlockを返却。着地済みは残す。
+- 設定・仕様・試験手順は`Docs/END_PHASE.md`。C#コンパイル成功（警告/エラー0）、Play Mode未確認。
 
 ## EnemyのItem取得（2026-09-09）
 

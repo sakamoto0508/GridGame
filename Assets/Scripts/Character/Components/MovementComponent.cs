@@ -15,6 +15,15 @@ public enum CharacterMoveState
 /// </summary>
 public class MovementComponent : MonoBehaviour
 {
+    /// <summary>論理グリッド座標が変化したときだけ通知します。</summary>
+    public event System.Action GridPositionChanged;
+
+    private void SetGridPosition(Vector3Int position)
+    {
+        if (_currentGridPosition == position) return;
+        _currentGridPosition = position;
+        GridPositionChanged?.Invoke();
+    }
     /// <summary>現在占有している論理グリッド座標です。</summary>
     public Vector3Int CurrentGridPosition => _currentGridPosition;
 
@@ -87,7 +96,7 @@ public class MovementComponent : MonoBehaviour
         }
 
         _gridManager = gridManager;
-        _currentGridPosition = startPosition;
+        SetGridPosition(startPosition);
         transform.position = _gridManager.GetWorldPosition(startPosition);
 
         if (_character == null ||
@@ -140,7 +149,7 @@ public class MovementComponent : MonoBehaviour
             return false;
         }
 
-        _currentGridPosition = destination;
+        SetGridPosition(destination);
         _ = MoveAwaitable(_gridManager.GetWorldPosition(destination));
         return true;
     }
@@ -161,7 +170,7 @@ public class MovementComponent : MonoBehaviour
         if (!_gridManager.TryMoveCharacter(startPosition, landingPosition, _character))
             return false;
 
-        _currentGridPosition = landingPosition;
+        SetGridPosition(landingPosition);
         _ = MoveAndFallAwaitable(edgePosition, landingPosition);
         return true;
     }
@@ -218,7 +227,7 @@ public class MovementComponent : MonoBehaviour
             return false;
         }
 
-        _currentGridPosition = airPosition;
+        SetGridPosition(airPosition);
         _ = JumpInPlaceAwaitable(groundPosition, airPosition);
         return true;
     }
@@ -238,7 +247,7 @@ public class MovementComponent : MonoBehaviour
             return false;
         }
 
-        _currentGridPosition = landingPosition;
+        SetGridPosition(landingPosition);
         _ = JumpUpAwaitable(_gridManager.GetWorldPosition(landingPosition));
         return true;
     }
@@ -287,7 +296,7 @@ public class MovementComponent : MonoBehaviour
                 return;
             }
 
-            _currentGridPosition = groundPosition;
+            SetGridPosition(groundPosition);
             await MoveToAwaitable(
                 _gridManager.GetWorldPosition(groundPosition), _settings.FallDuration);
         }
@@ -365,7 +374,7 @@ public class MovementComponent : MonoBehaviour
             return false;
         }
 
-        _currentGridPosition = destination;
+        SetGridPosition(destination);
         int fallDistance = startPosition.y - destination.y;
         _ = FallAwaitable(
             _gridManager.GetWorldPosition(destination),

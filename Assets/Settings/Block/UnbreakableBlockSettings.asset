@@ -14,3 +14,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::BlockSettings
   _type: 1
   _fallDuration: 0.5
+  _showOutline: 1
+  _outlineColor: {r: 0.27200428, g: 0.8213795, b: 0.9547169, a: 1}
+  _outlineWidthInCells: 0.025

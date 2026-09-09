@@ -22,10 +22,12 @@ public class Block : PooledGridObject
     private int _lifetimeVersion;
 
     public BlockType Type => _settings != null ? _settings.Type : BlockType.Unbreakable;
+    public bool HasSettings => _settings != null;
+    public bool IsFalling => _isFalling;
     public Vector3Int GridPosition { get; private set; }
 
     /// <summary>生成されたBlockへ論理グリッド座標を設定します。</summary>
-    public void Initialize(GridManager gridManager, Vector3Int gridPosition)
+    public void Initialize(GridManager gridManager, Vector3Int gridPosition, bool crushAtSpawn = false)
     {
         _gridManager = gridManager;
         GridPosition = gridPosition;
@@ -36,11 +38,18 @@ public class Block : PooledGridObject
             return;
         }
 
-        if (Type == BlockType.Breakable)
+
+        BlockOutlineView outline = GetComponent<BlockOutlineView>();
+        if (outline == null) 
+            outline = gameObject.AddComponent<BlockOutlineView>();
+        outline.Init(gridManager, _settings);
+
+        if (crushAtSpawn)
         {
-            BlockOutlineView outline = GetComponent<BlockOutlineView>();
-            if (outline == null) outline = gameObject.AddComponent<BlockOutlineView>();
-            outline.Init(gridManager, _settings);
+            int version = _lifetimeVersion;
+            CrushCharacterAt(gridPosition);
+            // 死亡イベントが試合を終了させ、プール返却した場合は落下を開始しません。
+            if (_isDestroyed || version != _lifetimeVersion) return;
         }
         TryStartFall();
     }
@@ -106,12 +115,16 @@ public class Block : PooledGridObject
         return TryStartFall();
     }
 
+    /// <summary>
+    /// Blockが落下可能なら、グリッド上の論理位置を移動して落下を開始します。
+    /// </summary>
+    /// <returns></returns>
     private bool TryStartFall()
     {
         if (_isDestroyed || _isFalling)
             return false;
 
-        if (!GridGravitySystem.TryGetBlockFallDestination(_gridManager,GridPosition,
+        if (!GridGravitySystem.TryGetBlockFallDestination(_gridManager, GridPosition,
                 out Vector3Int destination))
         {
             return false;
@@ -119,7 +132,7 @@ public class Block : PooledGridObject
 
         Vector3Int startPosition = GridPosition;
 
-        if (!_gridManager.TryMoveBlock(startPosition,destination,this))
+        if (!_gridManager.TryMoveBlock(startPosition, destination, this))
         {
             return false;
         }

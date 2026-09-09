@@ -8,9 +8,12 @@ public class StageGenerator : MonoBehaviour
 {
     public Vector3Int PlayerSpawnPosition => _settings.PlayerSpawnPosition;
     public Vector3Int EnemySpawnPosition => _settings.EnemySpawnPosition;
+    public GridManager Grid => _gridManager;
+    public Block UnbreakableBlockPrefab => _settings != null ? _settings.UnbreakableBlockPrefab : null;
 
     [SerializeField] private GridManager _gridManager;
     [SerializeField] private StageSettings _settings;
+    [SerializeField] private StageLightingSettings _lightingSettings;
     private BoundaryVisibilityController _boundaryView;
 
     /// <summary>通常グリッドの外に床・四方の壁・天井を作り、内部に破壊可能Blockを生成します。</summary>
@@ -27,6 +30,10 @@ public class StageGenerator : MonoBehaviour
         if (_boundaryView == null) _boundaryView = gameObject.AddComponent<BoundaryVisibilityController>();
         _boundaryView.Init(_gridManager);
         if (!GenerateBoundary()) return;
+        StageLightingController lighting = GetComponent<StageLightingController>();
+        if (lighting == null) 
+            lighting = gameObject.AddComponent<StageLightingController>();
+        lighting.Init(_gridManager, _lightingSettings);
         GenerateBreakableBlocks();
     }
 

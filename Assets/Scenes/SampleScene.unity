@@ -377,6 +377,7 @@ GameObject:
   - component: {fileID: 342725870}
   - component: {fileID: 342725869}
   - component: {fileID: 342725868}
+  - component: {fileID: 342725871}
   m_Layer: 0
   m_Name: CinemachineCamera
   m_TagString: Untagged
@@ -461,6 +462,19 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 45, y: 0, z: 0}
+--- !u!114 &342725871
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 342725867}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0def770a75959dc41ac841e9f46f63fe, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GridCameraSideController
+  _settings: {fileID: 0}
 --- !u!1 &410087039
 GameObject:
   m_ObjectHideFlags: 0
@@ -478,7 +492,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!108 &410087040
 Light:
   m_ObjectHideFlags: 0
@@ -716,6 +730,7 @@ MonoBehaviour:
   _stageGenerator: {fileID: 1948648122}
   _characterSpawner: {fileID: 1819605900}
   _gameState: {fileID: 2059915499}
+  _endPhaseSettings: {fileID: 0}
   _enemyDifficulty: 2
   _enemyAISettings: {fileID: 11400000, guid: bae13266d66760848ad718861d48ef5f, type: 2}
 --- !u!4 &1308266403

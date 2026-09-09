@@ -23,6 +23,14 @@ public sealed class GridDangerMap
 
     public bool IsDangerous(Vector3Int position) => _dangerTimes.ContainsKey(position);
 
+    /// <summary>落下予告などの危険時刻を追加します。爆風より遅い時刻で上書きしません。</summary>
+    public void RegisterDanger(Vector3Int position, float seconds)
+    {
+        seconds = Mathf.Max(0f, seconds);
+        if (!_dangerTimes.TryGetValue(position, out float old) || seconds < old)
+            _dangerTimes[position] = seconds;
+    }
+
     /// <summary>
     /// 指定したセルが何秒後に危険になるかを取得します。
     /// </summary>
@@ -56,6 +64,8 @@ public sealed class GridDangerMap
         PropagateChainTimes(bombs);
         foreach (BombPrediction bomb in bombs)
             RegisterDangerCells(bomb);
+        // 仮想Bombの安全確認でも落下予告を含め、落下予定列を逃げ先にしません。
+        gridManager.GetComponent<EndPhaseManager>()?.AppendDanger(this);
     }
 
     /// <summary>

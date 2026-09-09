@@ -1,0 +1,22 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ecbd16137fea19b4aae2f86ecfbc796a, type: 3}
+  m_Name: GameConfig
+  m_EditorClassIdentifier: Assembly-CSharp::GameConfig
+  _grid: {fileID: 0}
+  _characterMovement: {fileID: 0}
+  _characterPrefabs: {fileID: 0}
+  _bomb: {fileID: 0}
+  _stage: {fileID: 0}
+  _enemyAI: {fileID: 0}
+  _explosionVisual: {fileID: 0}
+  _gameHud: {fileID: 0}

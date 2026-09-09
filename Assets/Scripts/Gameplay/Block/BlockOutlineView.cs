@@ -49,7 +49,7 @@ public class BlockOutlineView : MonoBehaviour
     private void Refresh()
     {
         if (_line == null || _settings == null) return;
-        _line.enabled = _settings.ShowOutline && _settings.Type == BlockType.Breakable;
+        _line.enabled = _settings.ShowOutline;
         _line.widthMultiplier = _cellSize * _settings.OutlineWidthInCells;
         _material.color = _settings.OutlineColor;
     }
