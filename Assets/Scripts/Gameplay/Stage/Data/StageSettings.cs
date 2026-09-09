@@ -15,8 +15,6 @@ public class StageSettings : ScriptableObject
     [Header("Generation")]
     [SerializeField, Range(0f, 1f)] private float _breakableBlockRate = 0.4f;
     [SerializeField] private int _randomSeed = 12345;
-    [SerializeField, Min(0)] private int _floorY;
-    [SerializeField, Min(0)] private int _wallY = 1;
     [SerializeField, Min(0)] private int _breakableBlockY = 1;
 
     public Block UnbreakableBlockPrefab => _unbreakableBlockPrefab;
@@ -25,7 +23,5 @@ public class StageSettings : ScriptableObject
     public Vector3Int EnemySpawnPosition => _enemySpawnPosition;
     public float BreakableBlockRate => _breakableBlockRate;
     public int RandomSeed => _randomSeed;
-    public int FloorY => _floorY;
-    public int WallY => _wallY;
     public int BreakableBlockY => _breakableBlockY;
 }

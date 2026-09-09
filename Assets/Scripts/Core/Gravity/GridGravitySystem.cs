@@ -27,14 +27,15 @@ public static class GridGravitySystem
         while (gridManager.Contains(cursor))
         {
             Vector3Int below = cursor + Vector3Int.down;
-            if (!gridManager.Contains(below))
-                return false;
-
+            // Y=-1の外殻床も足場なので、範囲外チェックより先にBlockを確認します。
             if (gridManager.HasBlock(below))
             {
                 landingPosition = cursor;
                 return landingPosition.y < edgePosition.y;
             }
+
+            if (!gridManager.Contains(below))
+                return false;
 
             if (!gridManager.CanCharacterEnter(below))
                 return false;

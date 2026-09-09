@@ -68,6 +68,11 @@ public class CharacterSpawner : MonoBehaviour
         if (_cinemaCamera != null)
         {
             _cinemaCamera.Target.TrackingTarget = player.transform;
+            GridCameraSideController sideController = _cinemaCamera.GetComponent<GridCameraSideController>();
+            if (sideController == null)
+                sideController = _cinemaCamera.gameObject.AddComponent<GridCameraSideController>();
+            if (sideController.Init() && controller != null)
+                controller.InitCameraSideController(sideController);
         }
         return player;
     }

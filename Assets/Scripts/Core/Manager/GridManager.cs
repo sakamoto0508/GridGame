@@ -1,4 +1,5 @@
 using UnityEngine;
+using System.Collections.Generic;
 
 /// <summary>
 ///    ゲーム全体のマスを管理する。
@@ -70,6 +71,29 @@ public class GridManager : MonoBehaviour
     [SerializeField] private GridSettings _settings;
 
     private GridCell[][][] _cells;
+    // 通常セルは0～Size-1のまま。外殻だけ別管理し、負座標を配列添字にしません。
+    private readonly Dictionary<Vector3Int, Block> _boundaryBlocks = new();
+
+    /// <summary>内部を厚さ1セルで囲う外殻座標か。15セルなら各軸-1～15です。</summary>
+    public bool IsBoundaryPosition(Vector3Int position)
+    {
+        Vector3Int size = Size;
+        return size.x > 0 && size.y > 0 && size.z > 0 &&
+               position.x >= -1 && position.x <= size.x &&
+               position.y >= -1 && position.y <= size.y &&
+               position.z >= -1 && position.z <= size.z && !Contains(position);
+    }
+
+    /// <summary>外殻には破壊不可Blockのみを登録します。通常の配置APIからは配置できません。</summary>
+    public bool TryRegisterBoundaryBlock(Vector3Int position, Block block)
+    {
+        if (!IsBoundaryPosition(position) || block == null || block.Type != BlockType.Unbreakable)
+            return false;
+        if (_boundaryBlocks.TryGetValue(position, out Block existing) && existing != null)
+            return false;
+        _boundaryBlocks[position] = block;
+        return true;
+    }
 
     private void Awake()
     {
@@ -157,18 +181,18 @@ public class GridManager : MonoBehaviour
     /// <summary>指定セルにBlockが登録されているかを返します。</summary>
     public bool HasBlock(Vector3Int position)
     {
-        GridCell cell = GetCell(position);
-        return cell != null && cell.Block != null;
+        return GetBlock(position) != null;
     }
 
     /// <summary>
     /// 指定セルに存在するBlockを返します。
-    /// セルが範囲外、またはBlockが存在しない場合はnullを返します。
+    /// 通常セルに加えて外殻も取得します。それ以外の範囲外はnullを返します。
     /// </summary>
     public Block GetBlock(Vector3Int position)
     {
         GridCell cell = GetCell(position);
-        return cell?.Block;
+        if (cell != null) return cell.Block;
+        return _boundaryBlocks.TryGetValue(position, out Block boundary) ? boundary : null;
     }
 
     /// <summary>
@@ -419,6 +443,8 @@ public class GridManager : MonoBehaviour
     /// <returns></returns>
     public bool TryUnregisterBlock(Vector3Int position, Block block)
     {
+        if (_boundaryBlocks.TryGetValue(position, out Block boundary) && boundary == block)
+            return _boundaryBlocks.Remove(position);
         GridCell cell = GetCell(position);
         if (cell == null || cell.Block != block)
             return false;

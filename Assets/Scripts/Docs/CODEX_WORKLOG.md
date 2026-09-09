@@ -1,6 +1,30 @@
 # 3D Grid Bomber — Codex作業ログ兼仕様書
 
-最終更新: 2026-09-08
+最終更新: 2026-09-09
+
+## フィールド外殻（2026-09-09）
+
+- ユーザー確認済み: 内部Size=(15,15,15)なら内部座標0～14、外殻は各軸-1/15、外寸17×17×17。厚さ1セルで床・四方の壁・天井を囲う。
+- StageGeneratorは従来の内部Y=0床/1段の壁を廃止し、6面の外殻をプールから生成。角・辺は重複させない。内部の破壊可能Block生成はX/Z=0～Size-1を対象に変更し、開始安全地点の除外は維持。
+- StageSettingsのFloorY/WallYは廃止。床の高さは-1に固定。既存のPlayer/Enemy開始位置・BreakableBlockY設定は維持するため、Y=1なら足場がないとY=0へ落ちる。
+- GridManager.Containsは内部範囲のみ。外殻は専用DictionaryとTryRegisterBoundaryBlockで管理し、GetBlock/HasBlockでは外殻も参照できる。通常の移動・Item/Bomb/Block設置範囲は拡張しない。
+- 外殻Blockは重力対象外。返却時に外殻登録と固定フラグも解除する。AIの足場判定・段差からの落下先探索はY=-1床を認識するように修正。
+- 検証: コンパイルは警告/エラー0（未反映CameraSideSettingsを一時的にビルドへ追加）。座標生成アルゴリズムを15³/7³/2×3×4/1³で照合し、全外殻の網羅・重複なしを確認。15³の外殻は1,538個。
+- Play Mode未確認: 床Y=-1上でのPlayer/Enemy移動、外殻の固定・爆風耐性、天井でのジャンプ停止、再利用後のBlock重力を確認すること。
+- 注意: 不透明な天井・壁は外側カメラから内部を隠す。手前壁/天井の非表示・透過処理は今回実装していない。上空Itemは従来どおり内部最上段へ生成する。
+
+## E/Qによる視点切替（2026-09-09）
+
+- カメラ入力は1つのVector2 Actionへ統合。PlayerController.OnCameraChangeが値をGridCameraSideController.HandleInputへ渡し、カメラ側でXの正負を判断する。Yは未使用。同方向の継続入力は1回のみ、canceled時のゼロ入力で解除する。
+- UnityではCameraChange（Value/Vector2、Interactionsなし）の2D Vector Compositeを使い、Right=E、Left=Q、Up/Downは空欄。PlayerInputのUnity EventsからOnCameraChangeに接続する。今回Asset/Prefabは変更していない。
+
+- PlayerControllerがE/Q入力を受け、GridCameraSideControllerに90度の視点切替を要求。Eは右隣の辺側（初期-Z側なら+X側）、Qは逆方向。長押しでは連続回転しない。
+- CharacterSpawnerが設定済みCinemachineCameraに切替Componentを自動追加・注入。Player追従は維持し、FollowOffsetと仮想Cameraの回転を初期値から4方向に変更する。フィールド中心の周回ではなくPlayer追従視点の向き切替。
+- FollowのBinding ModeはWorld Space。高さ・距離・傾きを維持し、円弧上を既定0.4秒で滑らかに切り替える。CameraSideSettingsのTransitionDurationで調整し、0なら即時。切替中の追加入力にも現在の表示角度から対応する。通常追従のDampingは維持。
+- CameraSideSettingsはCreate > 3D Grid Bomber > Settings > Camera Sideから作成し、CinemachineCameraにGridCameraSideControllerを事前追加してSettingsへ設定する。未指定でも実行時SOの既定値を利用。
+- Rotation Control=Noneを推奨。Game Cameraは実際の描画用Cameraを維持し、移動入力は表示されたカメラ方向で計算する。
+- SampleSceneにはCinemachine Cameraが2つあるため、Spawnerに指定した方が出力されるよう、不要な方を無効化するかPriorityを設定する。Scene自体は変更していない。
+- Play Mode確認: E×4で一周、E→Qで元に戻る、長押し・同時押し、切替後の方向入力、ジャンプ・落下後も追従。
 
 ## Item・Blockプール化（2026-09-08）
 

@@ -12,7 +12,7 @@ public class StageGenerator : MonoBehaviour
     [SerializeField] private GridManager _gridManager;
     [SerializeField] private StageSettings _settings;
 
-    /// <summary>固定床、外壁、破壊可能Blockの順にステージを生成します。</summary>
+    /// <summary>通常グリッドの外に床・四方の壁・天井を作り、内部に破壊可能Blockを生成します。</summary>
     public void GenerateStage()
     {
         if (_gridManager == null || _settings == null)
@@ -22,48 +22,59 @@ public class StageGenerator : MonoBehaviour
         }
 
         Random.InitState(_settings.RandomSeed);
-        GenerateFloor();
-        GenerateOuterWalls();
+        if (!GenerateBoundary()) return;
         GenerateBreakableBlocks();
     }
 
     /// <summary>
-    /// ステージの床を生成する
+    /// 6面の外殻を生成します。面ごとの範囲を分け、辺と角の重複を避けます。
     /// </summary>
-    private void GenerateFloor()
+    private bool GenerateBoundary()
     {
-        Vector3Int size = _gridManager.Size;
-
-        for (int x = 0; x < size.x; x++)
+        Block prefab = _settings.UnbreakableBlockPrefab;
+        if (prefab == null || prefab.Type != BlockType.Unbreakable)
         {
-            for (int z = 0; z < size.z; z++)
+            Debug.LogError("外殻生成にはUnbreakableのBlock Prefabが必要です。", this);
+            return false;
+        }
+        Vector3Int size = _gridManager.Size;
+        // 床と天井は角も含めて全面を覆います。
+        for (int x = -1; x <= size.x; x++)
+        for (int z = -1; z <= size.z; z++)
+        {
+            SpawnBoundaryBlock(new Vector3Int(x, -1, z), prefab);
+            SpawnBoundaryBlock(new Vector3Int(x, size.y, z), prefab);
+        }
+        for (int y = 0; y < size.y; y++)
+        {
+            for (int z = -1; z <= size.z; z++)
             {
-                SpawnBlock(new Vector3Int(x, _settings.FloorY, z), _settings.UnbreakableBlockPrefab);
+                SpawnBoundaryBlock(new Vector3Int(-1, y, z), prefab);
+                SpawnBoundaryBlock(new Vector3Int(size.x, y, z), prefab);
+            }
+            // 四隅の列は上で生成済みなのでXは内部範囲のみ。
+            for (int x = 0; x < size.x; x++)
+            {
+                SpawnBoundaryBlock(new Vector3Int(x, y, -1), prefab);
+                SpawnBoundaryBlock(new Vector3Int(x, y, size.z), prefab);
             }
         }
+        return true;
     }
 
-    /// <summary>
-    /// ステージの外壁を生成する
-    /// </summary>
-    private void GenerateOuterWalls()
+    private void SpawnBoundaryBlock(Vector3Int position, Block prefab)
     {
-        Vector3Int size = _gridManager.Size;
-        int wallY = _settings.WallY;
-
-        for (int x = 0; x < size.x; x++)
+        // 再生成要求でも、登録済み外殻の重複生成はしません。
+        if (_gridManager.GetBlock(position) != null) return;
+        Block block = GridObjectPool.For(_gridManager).Rent(prefab,
+            _gridManager.GetWorldPosition(position), Quaternion.identity);
+        if (!_gridManager.TryRegisterBoundaryBlock(position, block))
         {
-            SpawnBlock(new Vector3Int(x, wallY, 0), _settings.UnbreakableBlockPrefab);
-
-            SpawnBlock(new Vector3Int(x, wallY, size.z - 1), _settings.UnbreakableBlockPrefab);
+            block.Despawn();
+            Debug.LogWarning($"外殻Blockの登録に失敗しました: {position}", this);
+            return;
         }
-
-        for (int z = 1; z < size.z - 1; z++)
-        {
-            SpawnBlock(new Vector3Int(0, wallY, z), _settings.UnbreakableBlockPrefab);
-
-            SpawnBlock(new Vector3Int(size.x - 1, wallY, z), _settings.UnbreakableBlockPrefab);
-        }
+        block.Initialize(_gridManager, position);
     }
 
     /// <summary>
@@ -96,9 +107,9 @@ public class StageGenerator : MonoBehaviour
         Vector3Int size = _gridManager.Size;
         int blockY = _settings.BreakableBlockY;
 
-        for (int x = 1; x < size.x - 1; x++)
+        for (int x = 0; x < size.x; x++)
         {
-            for (int z = 1; z < size.z - 1; z++)
+            for (int z = 0; z < size.z; z++)
             {
                 Vector3Int position = new Vector3Int(x, blockY, z);
 

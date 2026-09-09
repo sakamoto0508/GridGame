@@ -416,8 +416,8 @@ public static class GridPathfindingSystem
         // Characterが立つセルの1段下を足場セルとして調べます。
         Vector3Int below = position + Vector3Int.down;
 
-        // グリッド外へ落ちる場所や、直下にBlockがない場所は通常移動先にしません。
-        return gridManager.Contains(below) && gridManager.HasBlock(below);
+        // 外殻床(Y=-1)も足場として認識。立つセル自体は上で内部範囲を検証済みです。
+        return gridManager.HasBlock(below);
     }
 
     /// <summary>

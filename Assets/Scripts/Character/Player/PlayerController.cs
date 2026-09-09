@@ -11,6 +11,7 @@ public class PlayerController : MonoBehaviour
     private BombComponent _bombComponent;
     private Camera _camera;
     private Vector2 _moveInput;
+    private GridCameraSideController _cameraSideController;
 
     /// <summary>Spawnerからゲーム用Cameraを受け取ります。</summary>
     public void Init(Camera gameCamera)
@@ -19,6 +20,12 @@ public class PlayerController : MonoBehaviour
         _movementComponent = GetComponent<MovementComponent>();
         _blockPlacementComponent = GetComponent<BlockPlacementComponent>();
         _bombComponent = GetComponent<BombComponent>();
+    }
+
+    /// <summary>入力はPlayer側で受け取り、カメラ側には切替要求だけを渡します。</summary>
+    public void InitCameraSideController(GridCameraSideController controller)
+    {
+        _cameraSideController = controller;
     }
 
     /// <summary>
@@ -84,6 +91,21 @@ public class PlayerController : MonoBehaviour
         }
 
         _bombComponent.TryPlaceBomb();
+    }
+
+    /// <summary>入力値をそのままカメラ側へ渡します。左右の判断はカメラ側の責務です。</summary>
+    public void OnCameraChange(InputAction.CallbackContext context)
+    {
+        if (!context.performed && !context.canceled)
+            return;
+        // canceledのゼロ入力も渡し、キーを離したことをカメラ側に伝えます。
+        _cameraSideController?.HandleInput(context.ReadValue<Vector2>());
+    }
+
+    private void OnDisable()
+    {
+        // Playerが無効化されても、カメラ側に押下状態を残しません。
+        _cameraSideController?.HandleInput(Vector2.zero);
     }
 
     /// <summary>
