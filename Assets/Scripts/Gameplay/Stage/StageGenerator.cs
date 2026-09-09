@@ -11,6 +11,7 @@ public class StageGenerator : MonoBehaviour
 
     [SerializeField] private GridManager _gridManager;
     [SerializeField] private StageSettings _settings;
+    private BoundaryVisibilityController _boundaryView;
 
     /// <summary>通常グリッドの外に床・四方の壁・天井を作り、内部に破壊可能Blockを生成します。</summary>
     public void GenerateStage()
@@ -22,6 +23,9 @@ public class StageGenerator : MonoBehaviour
         }
 
         Random.InitState(_settings.RandomSeed);
+        _boundaryView = GetComponent<BoundaryVisibilityController>();
+        if (_boundaryView == null) _boundaryView = gameObject.AddComponent<BoundaryVisibilityController>();
+        _boundaryView.Init(_gridManager);
         if (!GenerateBoundary()) return;
         GenerateBreakableBlocks();
     }
@@ -65,7 +69,12 @@ public class StageGenerator : MonoBehaviour
     private void SpawnBoundaryBlock(Vector3Int position, Block prefab)
     {
         // 再生成要求でも、登録済み外殻の重複生成はしません。
-        if (_gridManager.GetBlock(position) != null) return;
+        Block existing = _gridManager.GetBlock(position);
+        if (existing != null)
+        {
+            _boundaryView.Register(existing, position);
+            return;
+        }
         Block block = GridObjectPool.For(_gridManager).Rent(prefab,
             _gridManager.GetWorldPosition(position), Quaternion.identity);
         if (!_gridManager.TryRegisterBoundaryBlock(position, block))
@@ -75,6 +84,7 @@ public class StageGenerator : MonoBehaviour
             return;
         }
         block.Initialize(_gridManager, position);
+        _boundaryView.Register(block, position);
     }
 
     /// <summary>

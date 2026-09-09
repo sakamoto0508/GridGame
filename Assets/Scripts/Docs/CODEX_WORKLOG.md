@@ -2,6 +2,23 @@
 
 最終更新: 2026-09-09
 
+## 側壁グリッド・破壊可能Block枠線（2026-09-09）
+
+- BoundaryVisibilityControllerに側壁4面の縦横グリッド線を追加。面番号で線を管理し、手前の非表示壁に属する線も非表示にする。外枠12辺は従来どおり別制御。
+- BoundaryViewSettings.ShowWallGridで側面線を表示切替。色・幅は既存のLineColor/LineWidthInCellsを共用。
+- Block.InitializeでBreakableにBlockOutlineViewを自動追加。1セルの12辺を子LineRendererで描画し、落下時も追従。1本の経路で全辺を通り、一部の辺は重複する。
+- BlockSettingsのShowOutline/OutlineColor/OutlineWidthInCellsで表示を調整。線・Materialは初回だけ生成してプール再利用時に再設定。返却時は非表示にし、Materialは最終破棄時に解放する。
+- C#ビルド: 警告/エラー0。Unity上での描画は未確認。側壁のE/Q切替、線と面の重なり、Blockの落下・破壊・再設置を確認すること。
+
+## 外殻の視認性改善（2026-09-09）
+
+- StageGeneratorがBoundaryVisibilityControllerを自動追加し、外殻だけをBoundaryBlockViewへ登録する。天井は常時非表示、床は常時表示。描画Cameraの視線方向から手前の壁を隠し、斜め視点では2面を隠す。
+- Renderer.forceRenderingOffだけを変更する。BlockのGameObject、Collider、グリッド登録は維持し、非表示の壁も移動制限として機能する。プール返却時は元の描画状態を復元。
+- 内部領域を囲う12本の枠線と床グリッド線をLineRendererで追加。専用ShaderはResources/BoundaryOutline.shader。奥の壁や内部Blockの素材は変更していない。
+- Cameraは未指定ならCamera.main。別の描画Cameraを使う場合はStageGeneratorのObjectにBoundaryVisibilityControllerを事前追加してCameraへ指定する。
+- 表示/線色/線幅はBoundaryViewSettingsで調整。Create > 3D Grid Bomber > Settings > Boundary Viewで作成し、事前追加したControllerへ設定。未指定時は実行時SOの既定値を使用。
+- C#コンパイルは警告/エラー0。Shaderと実際の描画はUnity Play Modeで未確認。確認項目: 4方向と回転途中、天井の非表示、床グリッド、非表示壁への移動不可、Block返却/再利用後の描画復元。
+
 ## フィールド外殻（2026-09-09）
 
 - ユーザー確認済み: 内部Size=(15,15,15)なら内部座標0～14、外殻は各軸-1/15、外寸17×17×17。厚さ1セルで床・四方の壁・天井を囲う。
@@ -11,7 +28,7 @@
 - 外殻Blockは重力対象外。返却時に外殻登録と固定フラグも解除する。AIの足場判定・段差からの落下先探索はY=-1床を認識するように修正。
 - 検証: コンパイルは警告/エラー0（未反映CameraSideSettingsを一時的にビルドへ追加）。座標生成アルゴリズムを15³/7³/2×3×4/1³で照合し、全外殻の網羅・重複なしを確認。15³の外殻は1,538個。
 - Play Mode未確認: 床Y=-1上でのPlayer/Enemy移動、外殻の固定・爆風耐性、天井でのジャンプ停止、再利用後のBlock重力を確認すること。
-- 注意: 不透明な天井・壁は外側カメラから内部を隠す。手前壁/天井の非表示・透過処理は今回実装していない。上空Itemは従来どおり内部最上段へ生成する。
+- 天井・手前壁の描画は「外殻の視認性改善」で非表示対応済み。上空Itemは従来どおり内部最上段へ生成する。
 
 ## E/Qによる視点切替（2026-09-09）
 

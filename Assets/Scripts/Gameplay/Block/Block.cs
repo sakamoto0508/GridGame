@@ -36,6 +36,12 @@ public class Block : PooledGridObject
             return;
         }
 
+        if (Type == BlockType.Breakable)
+        {
+            BlockOutlineView outline = GetComponent<BlockOutlineView>();
+            if (outline == null) outline = gameObject.AddComponent<BlockOutlineView>();
+            outline.Init(gridManager, _settings);
+        }
         TryStartFall();
     }
 
