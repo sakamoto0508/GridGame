@@ -16,6 +16,6 @@ MonoBehaviour:
   _startAfterSeconds: 60
   _warningSeconds: 2
   _dropInterval: 3
-  _blockPrefab: {fileID: 0}
+  _blockPrefab: {fileID: 1599753650031697247, guid: 1a45a7693cc40a44c9525c826b4eed3c, type: 3}
   _warningColor: {r: 1, g: 0.15, b: 0.05, a: 1}
   _lineWidthInCells: 0.06
