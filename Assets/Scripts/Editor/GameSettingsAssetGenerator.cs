@@ -61,6 +61,7 @@ public static class GameSettingsAssetGenerator
     [MenuItem("Tools/3D Grid Bomber/Create Default Settings Assets")]
     public static void CreateDefaultSettingsAssets()
     {
+        CreateAssetIfMissing<GameAudioSettings>("Assets/Settings/Audio/GameAudioSettings.asset");
         CreateAssetIfMissing<MatchSetupSettings>("Assets/Settings/UI/MatchSetupSettings.asset");
         CreateAssetIfMissing<StageLightingSettings>("Assets/Settings/Lighting/StageLightingSettings.asset");
         CreateAssetIfMissing<EndPhaseSettings>("Assets/Settings/EndPhase/EndPhaseSettings.asset");

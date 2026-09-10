@@ -67,6 +67,8 @@ public class Item : PooledGridObject
         _removed = true;
         _gridManager.TryUnregisterItem(GridPosition, this);
         inventory.Apply(_settings);
+        // Pool返却でItemが消えても、Manager側で音を最後まで再生します。
+        AudioManager.PlayAt(SoundId.ItemCollect, transform.position);
         Debug.Log($"Item取得: {character.name}, {_settings.Type} +{_settings.IncreaseAmount}", character);
         ReturnToPool();
         return true;

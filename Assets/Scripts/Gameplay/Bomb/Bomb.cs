@@ -101,6 +101,9 @@ public class Bomb : MonoBehaviour
 
         State = BombState.Exploded;
 
+        // 爆風セルごとではなく、Bombの二重爆発ガード通過後に1回だけ要求します。
+        AudioManager.PlayAt(SoundId.Explosion, _gridManager.GetWorldPosition(GridPosition));
+
         // 先に盤面から外し、爆風探索で爆発元自身を連鎖対象にしないようにします。
         _gridManager.TryUnregisterBomb(GridPosition, this);
 

@@ -98,6 +98,8 @@ public class BombComponent : MonoBehaviour
         _currentBombCount++;
         bomb.Exploded += HandleBombExploded;
         bomb.Init(_gridManager, position, _owner, _settings, ExplosionPower);
+        // 設置が成功した場合だけ発音します（Player・Enemy共通）。
+        AudioManager.PlayAt(SoundId.BombPlace, _gridManager.GetWorldPosition(position));
         NotifyStatsChanged();
         return true;
     }

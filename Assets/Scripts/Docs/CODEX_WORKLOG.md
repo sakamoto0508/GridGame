@@ -2,6 +2,15 @@
 
 最終更新: 2026-09-10
 
+## オーディオ管理（2026-09-10）
+
+- Audio/AudioManagerとAudio/Data/GameAudioSettingsを追加。Sceneに1個をInspector配置し、SOで音声候補・音量・音程・2D/3D・距離・同時数・最短間隔を指定する。
+- 固定数AudioSourceを再利用。SE全体/音別の上限超過時は新規要求をスキップ。発音元の死亡/Pool返却後も音は継続。Scene再読込では破棄する。
+- Bomb設置/爆発、Block設置、Item取得、Character死亡へ成功時の呼出しを接続。爆発音はセル単位ではなくBomb単位。UiConfirm/Win/Loseは識別子のみで未接続。
+- BGMループ再生/差替/停止、音量変更API、任意AudioMixer出力に対応。実行時の音量操作はSOを変更しない。UI/音素材/Scene配置は自動生成しない。
+- 既定Settings生成メニューにAudioを追加。設定・テスト手順はDocs/AUDIO_SETUP.md。
+- C#ビルド警告0・エラー0。音声未設定のため実際の発音確認は未実施。
+
 ## 試合設定画面（2026-09-10）
 
 - GameModeの起動時自動開始を廃止。公開StartMatch(difficulty)で選択難易度を受け取り、1回だけ生成する。通常起動はWaiting。

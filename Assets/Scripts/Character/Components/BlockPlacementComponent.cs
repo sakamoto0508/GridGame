@@ -101,6 +101,7 @@ public class BlockPlacementComponent : MonoBehaviour
         }
 
         block.Initialize(_gridManager, targetPosition);
+        AudioManager.PlayAt(SoundId.BlockPlace, _gridManager.GetWorldPosition(targetPosition));
         return true;
     }
 }

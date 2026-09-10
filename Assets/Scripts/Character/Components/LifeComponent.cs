@@ -37,6 +37,7 @@ public class LifeComponent : MonoBehaviour
             return false;
 
         IsAlive = false;
+        AudioManager.PlayAt(SoundId.CharacterDeath, transform.position);
 
         if (_movement != null)
             _movement.UnregisterFromGrid();
