@@ -1,6 +1,80 @@
 # 3D Grid Bomber — Codex作業ログ兼仕様書
 
-最終更新: 2026-09-10
+最終更新: 2026-09-11
+
+## Cyberpunk Cube 1のFlowシェーダーURP移植（2026-09-11）
+
+- 原因: インポートされたFlow_OnlyEmission_TransparentがBuilt-in用Surface Shaderで、URPの自動変換対象外。
+- Rendering/Shaders/FlowOnlyEmissionTransparentURP.shaderを追加。元のプロパティ名・UVスクロール・Ramp色変化・Sin点滅・Simplex/画像ノイズを維持。元アセットは未変更。
+- Editor/FlowShaderURPConverter.csに `Tools/NEON DETONATOR/Assets/Convert Flow Materials to URP` を追加。旧Shaderの.matだけを設定保持で差し替え、保存。確認ダイアログとUndo対応。
+- 調査時の対象はCyberpunk Cube 1/Art/Materials/CT_  fukong01.matの1つ。実際の差し替えはUnityでメニュー実行が必要。
+- 装飾用途のためShadowCasterは省略し、最終Alphaを0～1に制限。発光のBloomはカメラ側で必要。
+- 新規Editorコードを一時targetsで含めたC#ビルド成功（警告0/エラー0）。targetsは削除。UnityでのShaderコンパイル・描画は未確認。
+- 手順: Docs/FLOW_SHADER_URP.md。
+
+## 屋上・都市背景（2026-09-11）
+
+- StageGenerator.StartからRooftopBackgroundControllerを初期化。難易度選択中から暗い屋上台座・シアン帯・四辺のビル・シアン/緑の窓を表示する。
+- 台座1Mesh＋都市4Meshへ窓も結合。ColliderやGrid登録を作らず、専用System.Randomでゲーム乱数に影響させない。
+- MainCameraの向きに応じて手前側の都市を隠す。切り替えは即時で、フェードは未実装。
+- RooftopBackgroundSettingsで数・寸法・色・点灯率を調整。未指定は既定値を使用。既存のCreate Default Settings AssetsにEnvironmentカテゴリのSO生成を追加した。SceneへのSO割り当てはUnity上で行う。
+- Resources/NeonCityBackground.shaderはライト非依存の頂点カラー描画。既存のライト・Skybox・UI画像は変更しない。HDR色のにじみには既存カメラ側のBloomが必要。
+- 設定手順: Docs/ROOFTOP_BACKGROUND_SETUP.md。
+- 新規ファイルを一時targetsで含めたC#ビルド成功（警告0/エラー0）。一時targetsは削除済み。Unity上のShaderコンパイル・実描画・Q/E視認性は未確認。
+
+## 難易度選択色・発光サイズ・メニュー入力修正（2026-09-11）
+
+- 旧動作はUIフォーカス移動のみでは難易度が変わらなかった。専用InputActionsによりA/Dで難易度変更と緑表示、W/SでSTARTとのフォーカス移動、Enterで開始に変更。マウスも維持。
+- 設定画面中のみEventSystem.sendNavigationEventsを退避/無効化して二重入力を防ぎ、試合開始/OnDisable/OnDestroy時に復元。
+- Theme参照のフォールバックとSprite Override解除で選択色を確実に反映。
+- 発光の子RectTransformのScaleリセット不足/固定余白を修正。sourceのPPUとSpriteサイズ差、9スライスの圧縮率から位置/寸法を計算。Glow Paddingは廃止。
+- 保存済みSampleSceneは旧UI参照。適用/保存はUnityで必要。ビルド警告0/エラー0、Playでの操作/描画は未確認。
+
+## Overlay UIの発光（2026-09-11）
+
+- SceneのCanvasがOverlayであることを確認。Bloomのために描画方式を変えず、白いぼかし枠Spriteを着色して重ねる方式を実装。
+- GlowRing.png追加（288×160、境界40px、16px余白、中心透明）。生成元Editor/BuildNeonGlow.ps1。
+- NeonUIGlow追加。通常/強調/フォーカス/無効時の強さと広がりはTheme SO。Pointer/Select/Styleイベントのみで更新し毎フレーム監視なし。
+- UI適用メニューが既存パネルへImageをEditor配置。Raycast無効、文字の背面、結果CanvasGroupのフェードを継承。通常文字はぼかさない。
+- C#ビルド警告0/エラー0。PNGアルファの減衰確認済み。Scene反映とPlay Modeでの確認は未実施。
+
+## Tools整理・UI PNG作成（2026-09-11）
+
+- 旧テーマ適用/専用修復メニューを削除し、Tools/NEON DETONATOR/UIのApply Layout and SpritesとRefresh Stylesへ統合。Item/Explosion/Default Settings生成はAssetsサブメニューへ移動して維持。
+- UI/Art/NeonへオリジナルPNG8種を実ファイルで作成。透明角/9スライス境界24px。生成元はEditor/BuildNeonSprites.ps1、用途は同フォルダREADME。
+- 新規適用は標準Imageへ移行。独自Graphicは既存Sceneの移行互換用にのみ残す。SOのSprite参照を使って難易度/START/枠を切替。手動差替済みSpriteは維持。
+- PNGの寸法/透明を確認、選択ボタン画像を目視確認。新規Importerを含むC#ビルドは警告0/エラー0。Unityでのメニュー実行/シーン反映は未実施。
+
+## CanvasRenderer例外と開始画面の修正（2026-09-11）
+
+- ユーザーからNeonDifficultyHARDのMissingComponentException報告。UGUIソースでImageはCanvasRenderer必須、GraphicはRectTransformのみ必須であることを確認。独自Panelの必須指定不足/自動Renderer追加依存を修正。
+- CyberpunkPanelGraphicにRequireComponent(CanvasRenderer)。Editor生成はRendererを先にUndo管理下で追加。Repair NEON UI Renderersで既存PanelのRenderer欠落と破棄済みキャッシュを修復（Graphic再作成時も設定/Selectable参照保持）。配置適用時にも修復。
+- 添付画像に合わせ、開始画面を1040×860・左上タイトル/右上操作説明/中央難易度横並び/下STARTへ変更。タイトルはNEON DETONATORを維持。選択ボタンの緑塗りを廃止し緑枠へ。
+- 背景SpriteとTintをSOに追加（素材は未設定）。旧カラム区切りは非表示で保持。
+- ビルド警告0/エラー0、主要UI領域の範囲/非重複を計算確認。Scene未変更、Unityで修復/適用/保存/実行確認が必要。
+
+## 横並び難易度選択・分割HUD（2026-09-11）
+
+- MatchSetupUIにEasy/Normal/Hard ButtonとTheme参照を追加。新参照が揃えば旧Dropdownより優先し、クリックで選択、標準UI左右ナビゲーション/Submitに対応。選択状態を緑で維持。
+- 設定中は操作説明を有効化。EditorメニューでHOW TO PLAYカードを生成し既存ControlsTextを移動・プレビューする。
+- GameHudに人数/爆風/所持上限/設置数/座標の個別Textを追加。既存Actionから更新し、毎フレーム監視なし。旧Textは保持して非表示。
+- Editor適用メニューで左上の大きな人数、右上のラベル/数値行、下部キー枠、中央透明の外周枠を配置。Undoと再適用に対応。
+- Sceneへの反映はApply NEON DETONATOR Layoutの再実行待ち。C#ビルド警告0・エラー0。Unityでの表示/選択操作は未確認。
+
+## タイトル決定・NEON DETONATOR配置（2026-09-11）
+
+- ゲームタイトルを「NEON DETONATOR（ネオン・デトネーター）」に決定。SOへ英字/日本語/短縮表示の文言とタイトルサイズを追加。
+- Apply NEON DETONATOR Layoutメニューを追加。既存SOの配色/Fontを保持し、横長2カラムの設定画面、少し大きな結果画面、控えめなHUDタイトルへ再配置する。
+- 既存のCyberpunkTitle/各参照を再利用し、操作説明と選択操作を左右に分離。Object生成はEditorのみ。
+- C#ビルド確認。Scene反映と画面確認はUnityメニュー実行待ち。タイトル変更はUI対象でありProjectSettingsの製品名やコード名は変更していない。
+
+## 水色・黄色・緑のサイバーパンクUI（2026-09-11）
+
+- 画像サンプルの方向性に合わせ、UIテーマSO、角落としパネルGraphic、事前配置UIへのStyle設定を追加。
+- EditorのApply Cyberpunk UI Themeメニューで既存MatchSetupUI/GameHudの参照から適用。中央設定/結果、左右HUD、説明/操作ヒントを編集時に配置。実行時UI生成なし。Undo/再適用に対応。
+- Refresh Cyberpunk UI Stylesでレイアウトを維持した色/Fontの反映。SOに配色/フォント/初期配置値を集約。既定Settings生成にも追加。
+- 難易度Dropdown、イベント更新、勝敗フェード、既存ゲームロジックは維持。フォントダウンロード/音源/3Dモデル/ライト/爆風配色は未変更。
+- 手順と検証項目はDocs/CYBERPUNK_UI_SETUP.md。C#ビルド警告0・エラー0。Unityでのメニュー実行と見た目の確認は未実施で、Sceneはまだ変更していない。
 
 ## オーディオ管理（2026-09-10）
 

@@ -1,0 +1,60 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e2be7914e3800eb4a89ffd5a799c1c4e, type: 3}
+  m_Name: CyberpunkUITheme
+  m_EditorClassIdentifier: Assembly-CSharp::CyberpunkUITheme
+  Primary: {r: 0.4392157, g: 0.8745098, b: 1, a: 1}
+  Success: {r: 0.43137255, g: 0.9607843, b: 0.6039216, a: 1}
+  Warning: {r: 1, g: 0.89411765, b: 0.36078432, a: 1}
+  Text: {r: 0.9098039, g: 0.95686275, b: 0.9764706, a: 1}
+  Muted: {r: 0.5647059, g: 0.6666667, b: 0.72156864, a: 1}
+  Panel: {r: 0.043137256, g: 0.06666667, b: 0.09411765, a: 0.9490196}
+  BodyFont: {fileID: 0}
+  HeadingFont: {fileID: 0}
+  CornerCut: 14
+  BorderWidth: 2
+  HighlightTint: 0.2
+  DisabledAlpha: 0.35
+  ButtonFadeDuration: 0.1
+  ReferenceResolution: {x: 1920, y: 1080}
+  SetupSize: {x: 1040, y: 860}
+  ResultSize: {x: 720, y: 420}
+  StatusSize: {x: 380, y: 210}
+  AliveSize: {x: 190, y: 160}
+  ScreenMargin: 36
+  HeadingSize: 60
+  BodySize: 28
+  SmallSize: 22
+  Title: 'NEON
+
+    DETONATOR'
+  JapaneseTitle: "\u30CD\u30AA\u30F3\u30FB\u30C7\u30C8\u30CD\u30FC\u30BF\u30FC"
+  CompactTitle: NEON DETONATOR
+  TitleSize: 76
+  AliveNumberSize: 76
+  HudNumberSize: 32
+  SetupBackground: {fileID: 0}
+  SetupBackgroundTint: {r: 0.35, g: 0.42, b: 0.48, a: 1}
+  PanelCyanSprite: {fileID: 21300000, guid: c773528c6a781a14e8d0505803e4b4ae, type: 3}
+  PanelGreenSprite: {fileID: 21300000, guid: 9b7c4a55809e63844b255ab7cfc7c404, type: 3}
+  ButtonNeutralSprite: {fileID: 21300000, guid: 4af6f46a62a5ace45a548d1a56078950, type: 3}
+  ButtonSelectedSprite: {fileID: 21300000, guid: 0aec9005ef51e034f93b865a2cd26cde, type: 3}
+  ButtonPrimarySprite: {fileID: 21300000, guid: 3a32a86f1cb30944499c172c430ca652, type: 3}
+  FrameSprite: {fileID: 21300000, guid: 4f9911b27f88a6d43927bd0e004c3ba7, type: 3}
+  KeycapSprite: {fileID: 21300000, guid: f34335763b1746b4cbaf0a1bc0288a32, type: 3}
+  WarningSprite: {fileID: 21300000, guid: d7f79df97732ec34a9522a4a7e99e387, type: 3}
+  EnableGlow: 1
+  GlowSprite: {fileID: 21300000, guid: 0dc2f9d81bbeb1f4cb312f9fae38733c, type: 3}
+  GlowOpacity: 0.3
+  EmphasizedGlowOpacity: 0.85
+  HoverGlowOpacity: 0.65
+  DisabledGlowOpacity: 0.08

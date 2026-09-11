@@ -7,7 +7,7 @@ public static class GameSettingsAssetGenerator
 {
 
     /// <summary>Item設定と目印付きの球形Prefabを生成します。既存Assetは上書きしません。</summary>
-    [MenuItem("Tools/3D Grid Bomber/Create Item Assets")]
+    [MenuItem("Tools/NEON DETONATOR/Assets/Create Item Assets")]
     public static void CreateItemAssets()
     {
         EnsureFolder("Assets/Prefabs/Item");
@@ -58,9 +58,11 @@ public static class GameSettingsAssetGenerator
         Debug.Log("Item Assetを生成しました。SceneのItemManagerへItemDropSettingsを設定してください。球=爆風、立方体=所持数です。");
     }
 
-    [MenuItem("Tools/3D Grid Bomber/Create Default Settings Assets")]
+    [MenuItem("Tools/NEON DETONATOR/Assets/Create Default Settings Assets")]
     public static void CreateDefaultSettingsAssets()
     {
+        CreateAssetIfMissing<RooftopBackgroundSettings>("Assets/Settings/Environment/RooftopBackgroundSettings.asset");
+        CreateAssetIfMissing<CyberpunkUITheme>("Assets/Settings/UI/CyberpunkUITheme.asset");
         CreateAssetIfMissing<GameAudioSettings>("Assets/Settings/Audio/GameAudioSettings.asset");
         CreateAssetIfMissing<MatchSetupSettings>("Assets/Settings/UI/MatchSetupSettings.asset");
         CreateAssetIfMissing<StageLightingSettings>("Assets/Settings/Lighting/StageLightingSettings.asset");

@@ -14,7 +14,16 @@ public class StageGenerator : MonoBehaviour
     [SerializeField] private GridManager _gridManager;
     [SerializeField] private StageSettings _settings;
     [SerializeField] private StageLightingSettings _lightingSettings;
+    [SerializeField] private RooftopBackgroundSettings _backgroundSettings;
     private BoundaryVisibilityController _boundaryView;
+
+    /// <summary>背景は難易度選択中にも表示するため、試合開始を待たずに生成します。</summary>
+    private void Start()
+    {
+        RooftopBackgroundController background = GetComponent<RooftopBackgroundController>();
+        if (background == null) background = gameObject.AddComponent<RooftopBackgroundController>();
+        background.Init(_gridManager, _backgroundSettings);
+    }
 
     /// <summary>通常グリッドの外に床・四方の壁・天井を作り、内部に破壊可能Blockを生成します。</summary>
     public void GenerateStage()

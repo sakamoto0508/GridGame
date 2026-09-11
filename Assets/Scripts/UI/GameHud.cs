@@ -16,6 +16,12 @@ public class GameHud : MonoBehaviour
     [SerializeField] private TMP_Text _aliveCountText;
     [Tooltip("Sceneに配置したTMP Textを指定してください。UIは自動生成しません。")]
     [SerializeField] private TMP_Text _playerStatusText;
+    [Header("NEON HUD（任意・Editor配置）")]
+    [SerializeField] private TMP_Text _aliveValueText;
+    [SerializeField] private TMP_Text _powerValueText;
+    [SerializeField] private TMP_Text _limitValueText;
+    [SerializeField] private TMP_Text _placedValueText;
+    [SerializeField] private TMP_Text _positionValueText;
 
     [Header("Result UI")]
     [SerializeField] private GameObject _resultPanel;
@@ -83,10 +89,13 @@ public class GameHud : MonoBehaviour
     /// <summary>値を比較し、変化したときだけ文字列を更新。死亡後も最後の座標と残存Bomb数を表示します。</summary>
     private void RefreshPlayerStatus()
     {
-        if (_playerStatusText == null) return;
         if (_player == null || _playerBombs == null || _playerMovement == null)
         {
-            if (_statusValid || _playerStatusText.text != string.Empty) _playerStatusText.text = string.Empty;
+            if (_playerStatusText != null) _playerStatusText.text = string.Empty;
+            SetValue(_powerValueText, "--");
+            SetValue(_limitValueText, "--");
+            SetValue(_placedValueText, "--");
+            SetValue(_positionValueText, "-- / -- / --");
             _statusValid = false;
             return;
         }
@@ -103,6 +112,12 @@ public class GameHud : MonoBehaviour
         _lastPosition = position;
         _lastStatusFormat = format;
         _statusValid = true;
+        // 分割HUDも同じ通知から更新。毎フレームの監視やUIの動的生成は不要です。
+        SetValue(_powerValueText, power.ToString("00"));
+        SetValue(_limitValueText, limit.ToString("00"));
+        SetValue(_placedValueText, placed.ToString("00"));
+        SetValue(_positionValueText, $"{position.x:00} / {position.y:00} / {position.z:00}");
+        if (_playerStatusText == null || !_playerStatusText.gameObject.activeSelf) return;
         try
         {
             _playerStatusText.text = string.Format(format, power, limit, placed, position.x, position.y, position.z);
@@ -127,6 +142,7 @@ public class GameHud : MonoBehaviour
         RefreshPlayerStatus();
         if (_gameState != null)
         {
+            UpdateAliveCount(_gameState.AliveCharacterCount);
             _gameState.StateChanged += HandleStateChanged;
             _gameState.MatchFinished += HandleMatchFinished;
             _gameState.AliveCharacterCountChanged += UpdateAliveCount;
@@ -164,10 +180,16 @@ public class GameHud : MonoBehaviour
     /// <summary>現在の生存Character数を表示します。</summary>
     private void UpdateAliveCount(int aliveCount)
     {
+        SetValue(_aliveValueText, aliveCount.ToString("00"));
         if (_aliveCountText != null)
             _aliveCountText.text = _settings != null
                 ? string.Format(_settings.AliveFormat, aliveCount)
                 : $"ALIVE: {aliveCount}";
+    }
+
+    private static void SetValue(TMP_Text text, string value)
+    {
+        if (text != null && text.text != value) text.text = value;
     }
 
     /// <summary>新しい試合が始まったとき、前回の結果表示を閉じます。</summary>

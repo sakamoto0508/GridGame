@@ -19,7 +19,7 @@ public static class ExplosionEffectPrefabGenerator
         "Assets/Settings/Effects/ExplosionVisualSettings.asset";
 
     /// <summary>Materialと4種類の爆風Prefabを生成します。</summary>
-    [MenuItem("Tools/3D Grid Bomber/Create Explosion Effect Prefabs")]
+    [MenuItem("Tools/NEON DETONATOR/Assets/Create Explosion Effect Prefabs")]
     public static void CreateExplosionEffectPrefabs()
     {
         EnsureFolder(PrefabFolder);
