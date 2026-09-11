@@ -58,3 +58,7 @@ MonoBehaviour:
   EmphasizedGlowOpacity: 0.85
   HoverGlowOpacity: 0.65
   DisabledGlowOpacity: 0.08
+  EnableFlowGlow: 1
+  GlowFlowSpeed: 0.25
+  GlowFlowStrength: 0.8
+  GlowFlowWidth: 0.18

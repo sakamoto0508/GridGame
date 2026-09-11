@@ -2,6 +2,32 @@
 
 最終更新: 2026-09-11
 
+## UIの流れる発光（2026-09-11）
+
+- Resources/NeonUIFlow.shaderを追加。uGUIのAlpha/頂点色/Stencil/RectMask2D Softness対応を実装。9-sliceに依存しないローカル座標で光を周回。
+- NeonUIGlowが既存の発光子Imageだけへ専用Materialを適用。文字/本体/入力を変更せず、選択色とフェードを維持。無効化/破棄でMaterialを解放。
+- CyberpunkUIThemeにEnableFlowGlow、速度/強さ/幅を追加。既定ON。Update処理は追加せずGPU時間でアニメーション。
+- 実描画・Shaderコンパイルは未確認。設定/検証手順: Docs/UI_FLOW_GLOW.md。
+
+## フィールド下方の都市背景追加（2026-09-11）
+
+- RooftopBackgroundControllerへ台座下の建物胴体・低層ビル・道路灯を追加。ShowLowerCity既定ONで、起動時/再生成時に表示。
+- 下方の街はカメラ側の非表示対象から外し、Q/E回転で空白に戻らない構成。中央建物との交差を避け、低層ビルの高さを台座以下に制限。
+- 高層ビルの下も地面まで延長。下方の3結合MeshにはCollider/Lightを作らず、専用乱数列を使用。
+- RooftopBackgroundSettingsに地面深度・街の半径・間隔・高さ・明るさ・霞色の設定を追加。霞は頂点カラーで表現し、SceneのFogを変更しない。
+- Unityでの実描画/画角の確認は未実施。手順と調整項目はDocs/ROOFTOP_BACKGROUND_SETUP.md。
+
+## 不透明ブロック＋Flow発光（2026-09-11）
+
+- ユーザーのD3D11コンパイルログでHLSL予約語`line`との衝突を確認。NeonBlockFlowInput.hlslの変数と参照を`neonLineMask`へ修正。Unityでの再コンパイル結果は未確認。
+- Rendering/Shaders/BlockLitFlowURP.shaderとNeonBlockFlowInput.hlslを追加。不透明本体のURP PBR＋流れる発光を1マテリアルに統合。
+- ShadowCaster/DepthOnly/DepthNormals、追加ライト、GPU Instancing対応。動的Block向けSH環境光を使用。ライトマップ・法線マップ・モーションベクトルは未対応。
+- 初期模様はUVベースの細い発光枠＋流れる明るい帯。任意画像への切り替えや元Flowの色/ノイズ/点滅も利用可能。本体Alphaは常に1。
+- `Tools/NEON DETONATOR/Assets/Apply Block Lit Flow` で既存BreakBlockMaterial/UnbreakBlockMaterialのみ適用。初回バックアップ＋Undo対応。緑/水色のプリセットを設定。適用済みは上書きしない。
+- 元マテリアルのTransparent Queue・無効DepthOnly/ShadowCasterを解除してから適用する。Prefab参照やゲームロジック・Outlineは変更しない。
+- Editorコードを含むC#ビルド成功（警告0/エラー0）。一時targets削除済み。Unity上での適用・Shaderコンパイルと実描画は未確認。
+- 手順: Docs/BLOCK_LIT_FLOW.md。
+
 ## Cyberpunk Cube 1のFlowシェーダーURP移植（2026-09-11）
 
 - 原因: インポートされたFlow_OnlyEmission_TransparentがBuilt-in用Surface Shaderで、URPの自動変換対象外。

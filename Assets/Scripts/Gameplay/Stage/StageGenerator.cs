@@ -15,6 +15,10 @@ public class StageGenerator : MonoBehaviour
     [SerializeField] private StageSettings _settings;
     [SerializeField] private StageLightingSettings _lightingSettings;
     [SerializeField] private RooftopBackgroundSettings _backgroundSettings;
+    [Tooltip("設定するとランダム生成を行わず、この子に配置されたBlockを登録します。")]
+    [SerializeField] private Transform _sceneBlocksRoot;
+    public Transform SceneBlocksRoot => _sceneBlocksRoot;
+    public RooftopBackgroundSettings BackgroundSettings => _backgroundSettings;
     private BoundaryVisibilityController _boundaryView;
 
     /// <summary>背景は難易度選択中にも表示するため、試合開始を待たずに生成します。</summary>
@@ -26,24 +30,74 @@ public class StageGenerator : MonoBehaviour
     }
 
     /// <summary>通常グリッドの外に床・四方の壁・天井を作り、内部に破壊可能Blockを生成します。</summary>
-    public void GenerateStage()
+    public bool GenerateStage()
     {
         if (_gridManager == null || _settings == null)
         {
             Debug.LogError("StageGeneratorのGridManagerまたはStage Settingsが未設定です。", this);
-            return;
+            return false;
         }
 
         Random.InitState(_settings.RandomSeed);
         _boundaryView = GetComponent<BoundaryVisibilityController>();
         if (_boundaryView == null) _boundaryView = gameObject.AddComponent<BoundaryVisibilityController>();
         _boundaryView.Init(_gridManager);
-        if (!GenerateBoundary()) return;
+        if (_sceneBlocksRoot != null)
+        {
+            if (!RegisterSceneBlocks()) return false;
+        }
+        else if (!GenerateBoundary()) return false;
         StageLightingController lighting = GetComponent<StageLightingController>();
         if (lighting == null) 
             lighting = gameObject.AddComponent<StageLightingController>();
         lighting.Init(_gridManager, _lightingSettings);
-        GenerateBreakableBlocks();
+        if (_sceneBlocksRoot == null) GenerateBreakableBlocks();
+        return true;
+    }
+
+    /// <summary>全セルを検証→全Block登録→初期化の順で行い、未登録の足場へ落下しないようにします。</summary>
+    private bool RegisterSceneBlocks()
+    {
+        Block[] blocks = _sceneBlocksRoot.GetComponentsInChildren<Block>(false);
+        var positions = new System.Collections.Generic.Dictionary<Vector3Int, Block>();
+        float tolerance = Vector3.Distance(_gridManager.GetWorldPosition(Vector3Int.zero), _gridManager.GetWorldPosition(Vector3Int.right)) * 0.01f;
+        foreach (Block block in blocks)
+        {
+            Vector3Int p = _gridManager.GetGridPosition(block.transform.position);
+            bool boundary = _gridManager.IsBoundaryPosition(p);
+            if (!block.HasSettings || (!boundary && !_gridManager.Contains(p)) ||
+                (boundary && block.Type != BlockType.Unbreakable) ||
+                Vector3.Distance(block.transform.position, _gridManager.GetWorldPosition(p)) > tolerance ||
+                positions.ContainsKey(p) || _gridManager.GetBlock(p) != null ||
+                p == PlayerSpawnPosition || p == EnemySpawnPosition)
+            {
+                Debug.LogError($"Scene Blockの配置が不正です: {block.name}, {p}。セル中心・重複・範囲・Settings・開始地点を確認してください。", block);
+                return false;
+            }
+            positions.Add(p, block);
+        }
+        if (blocks.Length == 0) { Debug.LogError("Scene Blocks Rootに有効なBlockがありません。", this); return false; }
+        foreach (var entry in positions)
+        {
+            entry.Value.PrepareForRent(null); // Scene配置Blockの状態を初期化。破壊時は通常破棄します。
+            bool ok = _gridManager.IsBoundaryPosition(entry.Key)
+                ? _gridManager.TryRegisterBoundaryBlock(entry.Key, entry.Value)
+                : _gridManager.TryRegisterBlock(entry.Key, entry.Value);
+            if (!ok)
+            {
+                foreach (var registered in positions) _gridManager.TryUnregisterBlock(registered.Key, registered.Value);
+                Debug.LogError($"Scene Block登録に失敗しました: {entry.Key}", this);
+                return false;
+            }
+        }
+        System.Array.Sort(blocks, (a, b) => a.transform.position.y.CompareTo(b.transform.position.y));
+        foreach (Block block in blocks)
+        {
+            Vector3Int p = _gridManager.GetGridPosition(block.transform.position);
+            block.Initialize(_gridManager, p);
+            if (_gridManager.IsBoundaryPosition(p)) _boundaryView.Register(block, p);
+        }
+        return true;
     }
 
     /// <summary>
@@ -84,6 +138,9 @@ public class StageGenerator : MonoBehaviour
 
     private void SpawnBoundaryBlock(Vector3Int position, Block prefab)
     {
+#if UNITY_EDITOR
+        if (_editorBlocksRoot != null) { CreateEditorBlock(position, prefab); return; }
+#endif
         // 再生成要求でも、登録済み外殻の重複生成はしません。
         Block existing = _gridManager.GetBlock(position);
         if (existing != null)
@@ -113,6 +170,10 @@ public class StageGenerator : MonoBehaviour
     {
         if (!_gridManager.Contains(position) || prefab == null)
             return false;
+
+#if UNITY_EDITOR
+        if (_editorBlocksRoot != null) { CreateEditorBlock(position, prefab); return true; }
+#endif
 
         Block block = GridObjectPool.For(_gridManager).Rent(prefab, _gridManager.GetWorldPosition(position),
             Quaternion.identity);
@@ -160,4 +221,39 @@ public class StageGenerator : MonoBehaviour
                position == _settings.EnemySpawnPosition + Vector3Int.left ||
                position == _settings.EnemySpawnPosition + Vector3Int.back;
     }
+
+#if UNITY_EDITOR
+    private Transform _editorBlocksRoot;
+    /// <summary>現在のSeed/Settingsと同じ配置をPrefabインスタンスとしてSceneへ作ります。</summary>
+    public Transform BakeBlocksForScene()
+    {
+        if (Application.isPlaying || _gridManager == null || _settings == null ||
+            _settings.UnbreakableBlockPrefab == null || _settings.BreakableBlockPrefab == null)
+            throw new System.InvalidOperationException("Grid、StageSettings、2種類のBlock Prefabを設定してPlayを停止してください。");
+        Random.State state = Random.state;
+        GameObject root = new GameObject("Scene Stage Blocks");
+        UnityEngine.SceneManagement.SceneManager.MoveGameObjectToScene(root, gameObject.scene);
+        _editorBlocksRoot = root.transform;
+        try
+        {
+            Random.InitState(_settings.RandomSeed);
+            if (!GenerateBoundary()) throw new System.InvalidOperationException("外殻を生成できませんでした。");
+            GenerateBreakableBlocks();
+            UnityEditor.Undo.RecordObject(this, "Assign Scene Blocks");
+            _sceneBlocksRoot = root.transform;
+            UnityEditor.EditorUtility.SetDirty(this);
+            return root.transform;
+        }
+        catch { DestroyImmediate(root); throw; }
+        finally { _editorBlocksRoot = null; Random.state = state; }
+    }
+
+    private void CreateEditorBlock(Vector3Int position, Block prefab)
+    {
+        GameObject instance = (GameObject)UnityEditor.PrefabUtility.InstantiatePrefab(prefab.gameObject, _editorBlocksRoot);
+        instance.name = $"{prefab.name} [{position.x},{position.y},{position.z}]";
+        instance.transform.position = _gridManager.GetWorldPosition(position);
+        UnityEditor.PrefabUtility.RecordPrefabInstancePropertyModifications(instance.transform);
+    }
+#endif
 }

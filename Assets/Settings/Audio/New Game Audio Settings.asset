@@ -18,8 +18,8 @@ MonoBehaviour:
   VoiceCount: 16
   SfxOutput: {fileID: 0}
   MusicOutput: {fileID: 0}
-  DefaultMusic: {fileID: 0}
-  PlayMusicOnStart: 0
+  DefaultMusic: {fileID: 8300000, guid: 9fbb4a7da7b433b4695ffcfc01511b7a, type: 3}
+  PlayMusicOnStart: 1
   Sounds:
   - Id: 0
     Clips: []

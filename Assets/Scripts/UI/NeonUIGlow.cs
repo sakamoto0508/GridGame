@@ -15,6 +15,13 @@ public class NeonUIGlow : MonoBehaviour, IPointerEnterHandler, IPointerExitHandl
     private bool _emphasized;
     private bool _hovered;
     private bool _focused;
+    private Material _flowMaterial;
+    private Material _originalMaterial;
+    private Image _materialImage;
+    private static readonly int FlowRectId = Shader.PropertyToID("_FlowRect");
+    private static readonly int FlowSpeedId = Shader.PropertyToID("_FlowSpeed");
+    private static readonly int FlowStrengthId = Shader.PropertyToID("_FlowStrength");
+    private static readonly int FlowWidthId = Shader.PropertyToID("_FlowWidth");
 
     /// <summary>Editorで用意したImageを接続します。実行時にはUIを生成しません。</summary>
     public void SetImage(Image glowImage) { _glowImage = glowImage; Refresh(); }
@@ -37,6 +44,7 @@ public class NeonUIGlow : MonoBehaviour, IPointerEnterHandler, IPointerExitHandl
     {
         _hovered = _focused = false;
         if (_glowImage != null) _glowImage.enabled = false;
+        ReleaseFlowMaterial();
     }
     private void OnCanvasGroupChanged() => Refresh();
     public void OnPointerEnter(PointerEventData data) { _hovered = true; Refresh(); }
@@ -85,7 +93,59 @@ public class NeonUIGlow : MonoBehaviour, IPointerEnterHandler, IPointerExitHandl
         }
         rect.offsetMin = -padding;
         rect.offsetMax = padding;
+        RefreshFlowMaterial(rect, selectable == null || selectable.IsInteractable());
     }
+
+    /// <summary>設定/選択/サイズが変わった時だけ値を転送。光の移動はGPUの時間で行います。</summary>
+    private void RefreshFlowMaterial(RectTransform rect, bool interactable)
+    {
+        if (!_theme.EnableFlowGlow || !_glowImage.enabled)
+        {
+            ReleaseFlowMaterial();
+            return;
+        }
+        if (_materialImage != null && _materialImage != _glowImage) ReleaseFlowMaterial();
+        if (_flowMaterial == null)
+        {
+            Shader shader = Resources.Load<Shader>("NeonUIFlow");
+            if (shader == null) return; // 未インポート時は元の静的Glowを維持。
+            _flowMaterial = new Material(shader) { name = "Neon UI Flow (Instance)", hideFlags = HideFlags.HideAndDontSave };
+            _materialImage = _glowImage;
+            _originalMaterial = _glowImage.material;
+            _glowImage.material = _flowMaterial;
+        }
+        Rect bounds = rect.rect;
+        Vector4 flowRect = new Vector4(bounds.xMin, bounds.yMin, bounds.width, bounds.height);
+        float strength = interactable ? _theme.GlowFlowStrength : 0;
+        SetFlowProperties(_flowMaterial, flowRect, strength);
+        // Maskは複製Materialを使うため、実際の描画用Materialにも変更を反映します。
+        Material renderingMaterial = _glowImage.materialForRendering;
+        if (renderingMaterial != null && renderingMaterial != _flowMaterial)
+            SetFlowProperties(renderingMaterial, flowRect, strength);
+    }
+
+    private void SetFlowProperties(Material material, Vector4 rect, float strength)
+    {
+        material.SetVector(FlowRectId, rect);
+        material.SetFloat(FlowSpeedId, _theme.GlowFlowSpeed);
+        material.SetFloat(FlowStrengthId, strength);
+        material.SetFloat(FlowWidthId, _theme.GlowFlowWidth);
+    }
+
+    private void ReleaseFlowMaterial()
+    {
+        if (_materialImage != null && _materialImage.material == _flowMaterial)
+            _materialImage.material = _originalMaterial;
+        if (_flowMaterial != null)
+        {
+            if (Application.isPlaying) Destroy(_flowMaterial);
+            else DestroyImmediate(_flowMaterial);
+        }
+        _flowMaterial = null;
+        _materialImage = null;
+        _originalMaterial = null;
+    }
+    private void OnDestroy() => ReleaseFlowMaterial();
 
     // 画面サイズ/CanvasScaler変更時にも再計算。Updateでの監視はしません。
     private void OnRectTransformDimensionsChange() => Refresh();

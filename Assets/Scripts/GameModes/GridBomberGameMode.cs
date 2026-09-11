@@ -51,7 +51,7 @@ public class GridBomberGameMode : MonoBehaviour
         // 生成途中の失敗でも連打で二重生成させません。再試行はScene再読込で行います。
         _startAttempted = true;
 
-        _stageGenerator.GenerateStage();
+        if (!_stageGenerator.GenerateStage()) return false;
 
         PlayerCharacter player =
             _characterSpawner.SpawnPlayer(_stageGenerator.PlayerSpawnPosition);

@@ -59,6 +59,11 @@ public class CyberpunkUITheme : ScriptableObject
     [Range(0, 1)] public float EmphasizedGlowOpacity = 0.85f;
     [Range(0, 1)] public float HoverGlowOpacity = 0.65f;
     [Range(0, 1)] public float DisabledGlowOpacity = 0.08f;
+    [Header("UI Flow Glow")]
+    public bool EnableFlowGlow = true;
+    [Range(-2, 2)] public float GlowFlowSpeed = 0.25f;
+    [Range(0, 2)] public float GlowFlowStrength = 0.8f;
+    [Range(0.02f, 0.5f)] public float GlowFlowWidth = 0.18f;
 
     /// <summary>既存SOにも新レイアウトを適用。ユーザー指定の配色/Fontは変更しません。</summary>
     public void UseNeonLayout()
