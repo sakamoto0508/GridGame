@@ -20,8 +20,8 @@ public static class NeonSfxSynthesis
     public static void Generate(string folder)
     {
         Directory.CreateDirectory(folder);
-        string[] names = { "BombPlace", "Explosion", "BlockPlace", "ItemCollect", "CharacterDeath", "UiConfirm", "Win", "Lose", "UiSelect" };
-        double[] lengths = { .16, .48, .14, .38, .55, .19, .85, .75, .075 };
+        string[] names = { "BombPlace", "Explosion", "BlockPlace", "ItemCollect", "CharacterDeath", "UiConfirm", "Win", "Lose", "UiSelect", "CameraRotate" };
+        double[] lengths = { .16, .48, .14, .38, .55, .19, .85, .75, .075, .24 };
         for (int kind=0; kind<names.Length; kind++)
         {
             string path=Path.Combine(folder,names[kind]+".wav");
@@ -47,6 +47,8 @@ public static class NeonSfxSynthesis
                     case 6: value=Note(t,523,.24)+Note(t-.16,659,.25)+Note(t-.32,784,.28)+Note(t-.48,1047,.37); break;
                     case 7: value=Note(t,440,.27)+Note(t-.19,349,.28)+Note(t-.39,220,.36); break;
                     case 8: value=Chirp(t,1100,850,duration)*Math.Exp(-65*t); break;
+                    // 回転に合わせた短い電子的な風切り音。末尾に小さな確定音を重ねます。
+                    case 9: value=(.45*filteredNoise+.22*Chirp(t,420,1200,duration))*Math.Sin(Math.PI*t/duration)*Math.Exp(-4*t)+.18*Note(t-.17,950,.07); break;
                 }
                 // 両端を短くフェードし、再生開始・終了のクリックを防ぎます。
                 value *= Math.Min(1,t/.003)*Math.Min(1,(duration-t)/.012);

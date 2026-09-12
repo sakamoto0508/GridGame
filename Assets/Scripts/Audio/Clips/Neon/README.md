@@ -22,6 +22,7 @@
 | ItemCollect.wav | アイテム取得の上昇音 |
 | CharacterDeath.wav | デジタルな下降音 |
 | UiSelect.wav | 難易度変更 |
+| CameraRotate.wav | Q/Eで視点回転を受け付けた時の短い電子的な風切り音 |
 | UiConfirm.wav | 試合開始成功 |
 | Win.wav | 勝利 |
 | Lose.wav | 敗北 |

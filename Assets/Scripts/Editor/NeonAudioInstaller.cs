@@ -33,6 +33,7 @@ public static class NeonAudioInstaller
             if (sound.Clips != null && Array.Exists(sound.Clips, c => c != null)) continue;
             sound.Clips = new[] { pair.Value };
             sound.Volume = pair.Key == SoundId.Explosion ? 0.5f : pair.Key == SoundId.UiSelect ? 0.25f : 0.65f;
+            if (pair.Key == SoundId.CameraRotate) sound.Volume = 0.35f;
             sound.SpatialBlend = 0;
             sound.MaxVoices = pair.Key == SoundId.Explosion ? 3 : 2;
             sound.Cooldown = pair.Key == SoundId.Explosion ? 0.07f : 0.04f;

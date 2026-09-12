@@ -72,6 +72,8 @@ public class GridCameraSideController : MonoBehaviour
         _targetAngle -= 90f * step;
         _elapsed = 0f;
         _transitioning = true;
+        // 回転要求が受理された時だけ2D再生。追従移動やキーの押しっぱなしでは連続再生しません。
+        AudioManager.Play(SoundId.CameraRotate);
         if (_settings.TransitionDuration <= 0f)
             UpdateTransition(0f);
     }

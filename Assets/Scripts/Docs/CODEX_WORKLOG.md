@@ -2,6 +2,12 @@
 
 最終更新: 2026-09-12
 
+## カメラ切替SE（2026-09-12）
+
+- CameraRotate.wav（0.24秒）を波形合成。既存9音源は上書きしない。
+- SoundId末尾にCameraRotateを追加。GridCameraSideControllerで回転要求が受理された時だけ再生。追従移動や押しっぱなしでは連続再生しない。
+- Assign Generated SEを再実行すると設定の空欄に登録（初期音量0.35、同時2音、間隔0.04秒）。C#ビルド警告0/エラー0。実聴・Unityでの動作は未確認。
+
 ## 勝敗SEをフェード完了まで遅延（2026-09-12）
 
 - GameHudの勝敗SEを試合終了通知から結果フェード完了へ移動。ResultDelay＋FadeDurationの後に再生する。

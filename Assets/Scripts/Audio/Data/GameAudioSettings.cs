@@ -3,7 +3,7 @@ using UnityEngine;
 using UnityEngine.Audio;
 
 /// <summary>文字列の打ち間違いを防ぐSE識別子。追加時はSettingsのSoundsにも項目を追加します。</summary>
-public enum SoundId { BombPlace, Explosion, BlockPlace, ItemCollect, CharacterDeath, UiConfirm, Win, Lose, UiSelect }
+public enum SoundId { BombPlace, Explosion, BlockPlace, ItemCollect, CharacterDeath, UiConfirm, Win, Lose, UiSelect, CameraRotate }
 
 [Serializable]
 public class SoundDefinition
@@ -66,6 +66,6 @@ public class GameAudioSettings : ScriptableObject
     {
         new(SoundId.BombPlace), new(SoundId.Explosion), new(SoundId.BlockPlace),
         new(SoundId.ItemCollect), new(SoundId.CharacterDeath), new(SoundId.UiConfirm),
-        new(SoundId.Win), new(SoundId.Lose), new(SoundId.UiSelect)
+        new(SoundId.Win), new(SoundId.Lose), new(SoundId.UiSelect), new(SoundId.CameraRotate)
     };
 }
