@@ -112,7 +112,6 @@ public class GameHud : MonoBehaviour
         _lastPosition = position;
         _lastStatusFormat = format;
         _statusValid = true;
-        // 分割HUDも同じ通知から更新。毎フレームの監視やUIの動的生成は不要です。
         SetValue(_powerValueText, power.ToString("00"));
         SetValue(_limitValueText, limit.ToString("00"));
         SetValue(_placedValueText, placed.ToString("00"));
@@ -202,6 +201,10 @@ public class GameHud : MonoBehaviour
     /// <summary>勝者がPlayerかどうかを判定し、勝敗または引き分けを表示します。</summary>
     private void HandleMatchFinished(CharacterBase winner)
     {
+        // 勝者の参照が後から消えても結果を維持し、SEはフェード完了まで待ちます。
+        SoundId? resultSound = winner == null ? (SoundId?)null :
+        winner is PlayerCharacter ? SoundId.Win : SoundId.Lose;
+
         if (_resultText != null)
         {
             if (winner == null)
@@ -213,11 +216,11 @@ public class GameHud : MonoBehaviour
         }
 
         int sequenceVersion = ++_resultSequenceVersion;
-        _ = ShowResultAsync(sequenceVersion);
+        _ = ShowResultAsync(sequenceVersion, resultSound);
     }
 
     /// <summary>指定時間待った後、Result Panelを透明状態から徐々に表示します。</summary>
-    private async Awaitable ShowResultAsync(int sequenceVersion)
+    private async Awaitable ShowResultAsync(int sequenceVersion, SoundId? resultSound)
     {
         float elapsedTime = 0f;
 
@@ -234,7 +237,7 @@ public class GameHud : MonoBehaviour
                 return;
         }
 
-        if (_resultPanel == null)
+        if (!CanContinueResultSequence(sequenceVersion) || _resultPanel == null)
             return;
 
         _resultPanel.SetActive(true);
@@ -248,7 +251,7 @@ public class GameHud : MonoBehaviour
 
         if (fadeDuration <= 0f)
         {
-            CompleteResultFade();
+            CompleteResultFade(sequenceVersion, resultSound);
             return;
         }
 
@@ -264,7 +267,7 @@ public class GameHud : MonoBehaviour
                 return;
         }
 
-        CompleteResultFade();
+        CompleteResultFade(sequenceVersion, resultSound);
     }
 
     /// <summary>Result Panelを非表示にして操作も無効化します。</summary>
@@ -303,12 +306,14 @@ public class GameHud : MonoBehaviour
                sequenceVersion == _resultSequenceVersion;
     }
 
-    /// <summary>完全表示にしてResult Panel内のUI操作を有効化します。</summary>
-    private void CompleteResultFade()
+    /// <summary>完全表示にして操作を有効化し、勝敗SEを再生します。中断済みなら鳴らしません。</summary>
+    private void CompleteResultFade(int sequenceVersion, SoundId? resultSound)
     {
+        if (!CanContinueResultSequence(sequenceVersion) || _resultCanvasGroup == null) return;
         _resultCanvasGroup.alpha = 1f;
         _resultCanvasGroup.interactable = true;
         _resultCanvasGroup.blocksRaycasts = true;
+        if (resultSound.HasValue) AudioManager.Play(resultSound.Value);
     }
 
     /// <summary>現在開いているSceneを読み込み直して試合を最初から開始します。</summary>

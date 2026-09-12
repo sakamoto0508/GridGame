@@ -73,7 +73,7 @@ public class Block : PooledGridObject
         // Blockを論理グリッドから外してから、上のBlockを下側から順番に落とします。
         ReevaluateBlocksAbove(_gridManager, destroyedPosition);
 
-        // TODO: 破壊時のEffectとSoundを追加する。
+        // 未実装: 破壊時のエフェクトと効果音を追加する。
         ReturnToPool();
         return true;
     }

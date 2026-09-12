@@ -1,5 +1,5 @@
-# Original geometric UI PNGs. No external images or fonts are used.
-# Run explicitly to regenerate; existing PNG files will be overwritten.
+# 幾何学形状のUI画像を生成します。外部の画像やフォントは使用しません。
+# 再生成時に明示的に実行してください。既存のPNG画像は上書きされます。
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Drawing
 $spriteDirectory = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../UI/Art/Neon'))
@@ -15,7 +15,7 @@ $definitions = @(
     @('PanelWarning', '#FFE45C', '#0B1118', 240)
 )
 foreach ($definition in $definitions) {
-    # Render at 4x resolution, then downsample for antialiased corners.
+    # 4倍の解像度で描画してから縮小し、角の輪郭を滑らかにします。
     $bitmap = [System.Drawing.Bitmap]::new(1024, 512)
     $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
     $graphics.Clear([System.Drawing.Color]::Transparent)

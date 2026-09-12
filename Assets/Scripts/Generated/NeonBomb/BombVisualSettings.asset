@@ -1,0 +1,20 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1a4d503588f6d8147949da8880c5c434, type: 3}
+  m_Name: BombVisualSettings
+  m_EditorClassIdentifier: Assembly-CSharp::BombVisualSettings
+  NormalColor: {r: 0.1, g: 1.1, b: 1.6, a: 1}
+  WarningColor: {r: 1.8, g: 1.2, b: 0.1, a: 1}
+  WarningSeconds: 1
+  NormalPulseSpeed: 1
+  WarningPulseSpeed: 5
+  PulseScale: 0.025

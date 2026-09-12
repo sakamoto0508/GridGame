@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: ItemDropSettings
   m_EditorClassIdentifier: Assembly-CSharp::ItemDropSettings
   _prefabs:
-  - {fileID: 6216660581116159224, guid: 9519542f8d065504eae26e042eef8a2f, type: 3}
-  - {fileID: 5731179237376655413, guid: f291f0d725ca6a343a9249387a7af30e, type: 3}
+  - {fileID: 6412586597486415344, guid: 71c67dc37a1fa4549aa756d4f9572c57, type: 3}
+  - {fileID: 3834542619665730950, guid: 3dd9139ba231e2a4794d006164bb0757, type: 3}
   _dropInterval: 6
   _maxItemCount: 5

@@ -52,11 +52,11 @@ public static class GridUtility
     /// </summary>
     public static readonly Vector3Int[] SixDirections =
     {
-        new Vector3Int(1, 0, 0),   // Right
-        new Vector3Int(-1, 0, 0),  // Left
-        new Vector3Int(0, 1, 0),   // Up
-        new Vector3Int(0, -1, 0),  // Down
-        new Vector3Int(0, 0, 1),   // Forward
-        new Vector3Int(0, 0, -1)   // Backward
+        new Vector3Int(1, 0, 0),   // 右
+        new Vector3Int(-1, 0, 0),  // 左
+        new Vector3Int(0, 1, 0),   // 上
+        new Vector3Int(0, -1, 0),  // 下
+        new Vector3Int(0, 0, 1),   // 前
+        new Vector3Int(0, 0, -1)   // 後ろ
     };
 }

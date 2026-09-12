@@ -7,6 +7,8 @@ using UnityEngine;
 [RequireComponent(typeof(MovementComponent))]
 public class BlockPlacementComponent : MonoBehaviour
 {
+    /// <summary>設置成功時のみ通知。表示用モーションに使用します。</summary>
+    public event System.Action BlockPlaced;
     private GridManager _gridManager;
     private MovementComponent _movement;
     private Block _blockPrefab;
@@ -102,6 +104,7 @@ public class BlockPlacementComponent : MonoBehaviour
 
         block.Initialize(_gridManager, targetPosition);
         AudioManager.PlayAt(SoundId.BlockPlace, _gridManager.GetWorldPosition(targetPosition));
+        BlockPlaced?.Invoke();
         return true;
     }
 }

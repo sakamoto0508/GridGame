@@ -61,6 +61,7 @@ public static class GameSettingsAssetGenerator
     [MenuItem("Tools/NEON DETONATOR/Assets/Create Default Settings Assets")]
     public static void CreateDefaultSettingsAssets()
     {
+        CreateAssetIfMissing<CharacterDeathVisualSettings>("Assets/Settings/Effects/CharacterDeathVisualSettings.asset");
         CreateAssetIfMissing<RooftopBackgroundSettings>("Assets/Settings/Environment/RooftopBackgroundSettings.asset");
         CreateAssetIfMissing<CyberpunkUITheme>("Assets/Settings/UI/CyberpunkUITheme.asset");
         CreateAssetIfMissing<GameAudioSettings>("Assets/Settings/Audio/GameAudioSettings.asset");

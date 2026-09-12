@@ -20,6 +20,7 @@ public class LifeComponent : MonoBehaviour
 
     private CharacterBase _character;
     private MovementComponent _movement;
+    [SerializeField] private CharacterDeathVisualSettings _deathVisualSettings;
 
     private void Awake()
     {
@@ -37,6 +38,9 @@ public class LifeComponent : MonoBehaviour
             return false;
 
         IsAlive = false;
+        // 勝敗イベントでCharacterが無効化される前に、独立した見た目を生成します。
+        try { CharacterDeathBurst.Spawn(_character, transform, _deathVisualSettings, cause); }
+        catch (Exception error) { Debug.LogException(error, this); } // 表示の失敗で死亡処理を中断しない。
         AudioManager.PlayAt(SoundId.CharacterDeath, transform.position);
 
         if (_movement != null)
@@ -45,7 +49,7 @@ public class LifeComponent : MonoBehaviour
         Debug.Log($"Character died: Name={name}, Cause={cause}", this);
         Died?.Invoke(_character, cause);
 
-        // 勝敗処理と死亡演出を追加するまでは、死亡Characterを非表示・操作不能にします。
+        // 破片は独立Objectなので、本人を非表示にしても演出は継続します。
         gameObject.SetActive(false);
         return true;
     }

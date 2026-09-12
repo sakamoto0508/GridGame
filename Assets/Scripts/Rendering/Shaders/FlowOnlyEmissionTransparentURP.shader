@@ -1,4 +1,4 @@
-// URP port of the imported Xuqi Flow_OnlyEmission_Transparent shader.
+// インポートされたXuqi製Flow_OnlyEmission_TransparentシェーダーのURP対応版。
 // 元のプロパティ名とSimplexノイズを維持し、既存マテリアルの設定を引き継ぎます。
 // ASEグラフではなく手書きURPシェーダーです。元ファイルは変更しません。
 Shader "NEON DETONATOR/URP/Flow Only Emission Transparent"
@@ -176,4 +176,3 @@ Shader "NEON DETONATOR/URP/Flow Only Emission Transparent"
     }
     Fallback Off
 }
-

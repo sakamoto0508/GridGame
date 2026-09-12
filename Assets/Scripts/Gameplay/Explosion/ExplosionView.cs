@@ -41,6 +41,9 @@ public class ExplosionView : MonoBehaviour
 
             // Bombの子にするとBomb破棄時に一緒に消えるため、親を設定せず生成します。
             ExplosionEffect effect = Instantiate(prefab, worldPosition, rotation);
+            if (_settings.ScaleToCell)
+                effect.transform.localScale *= Vector3.Distance(gridManager.GetWorldPosition(Vector3Int.zero),
+                    gridManager.GetWorldPosition(Vector3Int.right));
             effect.Play(_settings.EffectDuration);
         }
 

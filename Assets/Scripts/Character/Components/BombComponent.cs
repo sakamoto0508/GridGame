@@ -10,6 +10,8 @@ public class BombComponent : MonoBehaviour
 {
     /// <summary>設置数・アイテム強化による能力が変わったときの通知です。</summary>
     public event System.Action StatsChanged;
+    /// <summary>設置成功時のみ通知。表示用モーションに使用します。</summary>
+    public event System.Action BombPlaced;
     private InventoryComponent _inventory;
     /// <summary>現在盤面に残っている、このCharacterのBomb数です。</summary>
     public int CurrentBombCount => _currentBombCount;
@@ -101,6 +103,7 @@ public class BombComponent : MonoBehaviour
         // 設置が成功した場合だけ発音します（Player・Enemy共通）。
         AudioManager.PlayAt(SoundId.BombPlace, _gridManager.GetWorldPosition(position));
         NotifyStatsChanged();
+        BombPlaced?.Invoke();
         return true;
     }
 

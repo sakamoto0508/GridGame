@@ -1,0 +1,113 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 50dbcde1f8f158a4c8f84c72aebf12cf, type: 3}
+  m_Name: GameAudioSettings
+  m_EditorClassIdentifier: Assembly-CSharp::GameAudioSettings
+  MasterVolume: 1
+  SfxVolume: 1
+  MusicVolume: 0.4
+  VoiceCount: 36
+  SfxOutput: {fileID: 0}
+  MusicOutput: {fileID: 0}
+  DefaultMusic: {fileID: 8300000, guid: 9fbb4a7da7b433b4695ffcfc01511b7a, type: 3}
+  PlayMusicOnStart: 1
+  Sounds:
+  - Id: 0
+    Clips:
+    - {fileID: 8300000, guid: 121dda8e91e833e4e8147eafe68a72d7, type: 3}
+    Volume: 0.65
+    Pitch: 1
+    MaxVoices: 16
+    Cooldown: 0.04
+    SpatialBlend: 0
+    MinDistance: 3
+    MaxDistance: 30
+  - Id: 1
+    Clips:
+    - {fileID: 8300000, guid: c86d826d6e5694546a7a9d384a52e73b, type: 3}
+    Volume: 0.5
+    Pitch: 1
+    MaxVoices: 16
+    Cooldown: 0.07
+    SpatialBlend: 0
+    MinDistance: 3
+    MaxDistance: 30
+  - Id: 2
+    Clips:
+    - {fileID: 8300000, guid: 005478151b057f241b88520c830aa9ea, type: 3}
+    Volume: 0.65
+    Pitch: 1
+    MaxVoices: 32
+    Cooldown: 0.04
+    SpatialBlend: 0
+    MinDistance: 3
+    MaxDistance: 30
+  - Id: 3
+    Clips:
+    - {fileID: 8300000, guid: 5d2814f4ce2675345bf03c644b651825, type: 3}
+    Volume: 0.65
+    Pitch: 1
+    MaxVoices: 10
+    Cooldown: 0.04
+    SpatialBlend: 0
+    MinDistance: 3
+    MaxDistance: 30
+  - Id: 4
+    Clips:
+    - {fileID: 8300000, guid: 65a846e7f37961542b7fb33b9b0491d5, type: 3}
+    Volume: 1
+    Pitch: 1
+    MaxVoices: 2
+    Cooldown: 0.04
+    SpatialBlend: 0
+    MinDistance: 3
+    MaxDistance: 30
+  - Id: 5
+    Clips:
+    - {fileID: 8300000, guid: 7814242cd7d12084fa8f4388b5580a8e, type: 3}
+    Volume: 0.65
+    Pitch: 1
+    MaxVoices: 5
+    Cooldown: 0.04
+    SpatialBlend: 0
+    MinDistance: 3
+    MaxDistance: 30
+  - Id: 6
+    Clips:
+    - {fileID: 8300000, guid: e76e3edb704020842af7c0aa842f58a6, type: 3}
+    Volume: 0.65
+    Pitch: 1
+    MaxVoices: 2
+    Cooldown: 0.04
+    SpatialBlend: 0
+    MinDistance: 3
+    MaxDistance: 30
+  - Id: 7
+    Clips:
+    - {fileID: 8300000, guid: 3bfec318f79f4bf4f883d49a3f452535, type: 3}
+    Volume: 0.65
+    Pitch: 1
+    MaxVoices: 2
+    Cooldown: 0.04
+    SpatialBlend: 0
+    MinDistance: 3
+    MaxDistance: 30
+  - Id: 8
+    Clips:
+    - {fileID: 8300000, guid: c671e7f9395a3d1439b796892debe240, type: 3}
+    Volume: 0.25
+    Pitch: 1
+    MaxVoices: 2
+    Cooldown: 0.04
+    SpatialBlend: 0
+    MinDistance: 3
+    MaxDistance: 30

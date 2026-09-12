@@ -1,6 +1,57 @@
 # 3D Grid Bomber — Codex作業ログ兼仕様書
 
-最終更新: 2026-09-11
+最終更新: 2026-09-12
+
+## 勝敗SEをフェード完了まで遅延（2026-09-12）
+
+- GameHudの勝敗SEを試合終了通知から結果フェード完了へ移動。ResultDelay＋FadeDurationの後に再生する。
+- 勝敗の音IDを非同期処理へ渡して保持。結果表示の中断/無効化時は世代チェックで再生をキャンセル。引き分けでは鳴らさない。
+
+## 合成SE一式と英語コメントの日本語化（2026-09-12）
+
+- Editor/GenerateNeonSfx.ps1で9種類のWAVを実際に生成。Audio/Clips/Neonに保存。外部サンプル不使用の波形合成、44.1kHz/16bit/mono、ピーク0.72。
+- Assign Generated SEメニューで選択中（未選択時は既定）のGameAudioSettingsの空欄を補完。既存Clip/BGM/Mixerは維持。
+- SoundId末尾にUiSelectを追加（既存列挙値を維持）。難易度変更・開始成功・GameHudの勝敗通知を音声へ接続。従来の設置/爆発/取得/死亡の再生処理は維持。
+- 自作コード内の英語のみの自然言語コメントを日本語化。座標方向、探索用コレクション説明、シェーダー冒頭、画像生成スクリプトを修正。識別子/XMLタグ/外部アセットは変更しない。
+- C#ビルド警告0/エラー0。9音源のWAVヘッダー/データ長/ピーク検証成功。実聴/Unity上の再生/音量バランスは未確認。
+- 手順と用途: Audio/Clips/Neon/README.md。
+
+## ロボットキャラクターとパーツ式アニメーション（2026-09-12）
+
+- Apply Robot Charactersで既存Player/Enemy Prefabをバックアップし、描画子モデル＋RobotCharacterViewを追加。ロジック/Colliderは維持。
+- グレーの小型ロボット、Player水色、Enemy黄色＋アンテナ。Animator/FBXではなくプリミティブのパーツ回転式。
+- 移動状態/実移動距離/向きから待機・歩行・ジャンプ/落下・着地を表示。設置成功イベントをBombComponent/BlockPlacementComponentに追加し腕モーションを再生。
+- 設定はGenerated/RobotCharacters/RobotVisualSettings。C#ビルド警告0/エラー0、Unity適用/描画は未確認。手順Docs/ROBOT_CHARACTERS.md。
+
+## キャラクターの立方体破片による死亡演出（2026-09-12）
+
+- LifeComponent.Killの一度限りの死亡処理から、勝敗通知/本人無効化前にCharacterDeathBurstを生成。見た目の例外でも死亡処理を止めない。
+- 本人のRenderer Bounds内から既定90個の小さな立方体を放出。World空間で回転/重力落下し、寿命終盤に縮小。下敷き死亡は横に強く散る。Player水色/Enemy黄色と本体色を混ぜる。
+- 独立ParticleSystemで本人非表示後も再生し、終了時に生成Mesh/Materialとともに破棄。床との衝突はなく、ゲーム判定も持たない。Scene再読込時はSceneと共に消える。
+- LifeComponentのDeath Visual Settings未設定でも既定値で動作。Create Default Settings AssetsでEffects/CharacterDeathVisualSettingsを生成し、Player/Enemy PrefabのLifeComponentへ指定すれば数/色/速度/寿命を調整できる。
+- C#ビルド成功（警告0/エラー0）。Unity上のShaderコンパイル・死亡時の描画は未確認。
+
+## ネオン爆風（2026-09-12）
+
+- Create Neon Explosion PrefabsメニューでAssets/Scripts/Generated/NeonExplosionに中心・直線・先端・衝突先端の4Prefabを生成。元の炎Prefabは変更しない。
+- 細い水色ビーム＋黄白色の芯＋少量の短い光片を加算Particle Shaderで描画。方向は既存ExplosionView、判定は既存ExplosionSystemのまま。
+- 生成したNeonExplosionVisualSettingsをBombPrefabのExplosionView.Settingsへ手動設定する。色/太さ/寿命/光片数はNeonExplosionStyleSettings変更後に再生成（確認付き上書き）。
+- ExplosionVisualSettingsにScaleToCellを追加（旧設定はOFF）。ネオン設定ではONにし、1セルの線分を実セルサイズへ合わせる。
+- C#ビルド成功、警告0/エラー0。UnityのShaderコンパイル・Prefab生成・実描画は未確認。にじむ発光にはカメラのHDR/Bloomが別途必要。
+
+## ネオンBombの見た目（2026-09-12）
+
+- Apply Neon Bomb Visualメニュー追加。Assets/Prefabs/Block/BombPrefab.prefabのルートRendererだけ無効化し、暗い球体・発光帯・導火部ランプを描画子として追加。元Bomb/ExplosionView/ColliderとPrefab参照を維持する。
+- 初回はAssets/Scripts/Generated/NeonBomb/BombPrefab_BeforeNeon.prefabへバックアップ。適用済みはスキップする。通常Undoではなくバックアップから復旧する。
+- NeonBombViewが残りFuseを参照し、通常は水色、残り1秒で黄色の速い点滅にする。表示子だけ小さく脈動。設定は同フォルダのBombVisualSettings。
+- C#ビルド成功（警告0/エラー0）。UnityのPrefab適用・実描画は未実行。使用中のBombSettingsが別のPrefabを参照する場合はこのPrefabへ設定する必要がある。
+
+## ネオンItem Prefab生成（2026-09-12）
+
+- Create Neon Item Prefabsメニューを追加。Assets/Scripts/Generated/NeonItemsへ2種類のPrefab・ItemSettings・表示SO・URP Unlit素材を生成する。既存Prefabは上書きしない。
+- 黄色の外向き矢印=BombPower、緑のボム＋=BombCount。間欠リングが回転し、記号は実カメラを向く。表示子だけを変更し、取得/落下/Pool処理は維持。
+- ItemDropSettings.Prefabsへ生成した2つを割り当てる操作が必要。効果量等は新規ItemSettingsの既定値なので、従来の調整値があれば転記する。
+- Unity上の生成と描画は未実行。表示スケールとリング回転速度はItemVisualSettingsで調整。
 
 ## UIの流れる発光（2026-09-11）
 

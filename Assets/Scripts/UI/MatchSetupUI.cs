@@ -110,6 +110,7 @@ public class MatchSetupUI : MonoBehaviour
     private void HandleDifficultyChanged(int index)
     {
         if (_gameMode == null || !_gameMode.CanStart || index < 0 || index > 2) return;
+        if ((int)_selectedDifficulty != index) AudioManager.Play(SoundId.UiSelect);
         _selectedDifficulty = (EnemyDifficulty)index;
         if (_difficultyDropdown != null) _difficultyDropdown.SetValueWithoutNotify(index);
         RefreshDifficultyButtons();
@@ -153,6 +154,7 @@ public class MatchSetupUI : MonoBehaviour
             if (_errorText != null) _errorText.text = _settings.StartFailedText;
             _startButton.interactable = _gameMode.CanStart;
         }
+        else AudioManager.Play(SoundId.UiConfirm);
     }
 
     private void ApplyState(MatchState state)

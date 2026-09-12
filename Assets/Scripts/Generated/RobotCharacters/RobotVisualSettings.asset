@@ -1,0 +1,24 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 66804f9a6b50ce54c9cca24fa1b1fa7a, type: 3}
+  m_Name: RobotVisualSettings
+  m_EditorClassIdentifier: Assembly-CSharp::RobotVisualSettings
+  TurnSpeed: 15
+  PoseSpeed: 18
+  StrideLength: 0.5
+  WalkSwing: 30
+  WalkLean: 8
+  IdleBob: 0.012
+  IdleFrequency: 1.2
+  PlacementDuration: 0.2
+  LandingDuration: 0.16
+  LandingSquash: 0.16

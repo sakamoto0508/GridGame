@@ -400,22 +400,22 @@ public static class GridPathfindingSystem
         if (gridManager == null || dangerMap == null || !gridManager.Contains(start))
             return emptyPath;
 
-        // open:
+        // 探索待ちのセル:
         // これから隣接セルを調べる「探索待ちセル」のFIFOキューです。
         // FIFOなので、startから1手、2手、3手の順に近いセルから展開されます。
         Queue<Vector3Int> open = new Queue<Vector3Int>();
 
-        // visited:
+        // 訪問済みのセル:
         // すでに発見したセルです。同じセルを何度もキューへ入れて無限ループすることを防ぎます。
         HashSet<Vector3Int> visited = new HashSet<Vector3Int>();
 
-        // previous:
+        // 経路を逆にたどるための直前セル:
         // 「そのセルへどのセルから来たか」を記録します。
         // ゴール発見後、goalからstartまで逆向きにたどって経路を復元するために使います。
         Dictionary<Vector3Int, Vector3Int> previous =
             new Dictionary<Vector3Int, Vector3Int>();
 
-        // arrivalTimes:
+        // 各セルへの到着予想時刻:
         // startから各セルへ到着する予想時刻（探索開始からの経過秒）です。
         // GridDangerMapの爆発時刻と比較し、到着前後に爆発するセルを除外します。
         Dictionary<Vector3Int, float> arrivalTimes = new Dictionary<Vector3Int, float>();

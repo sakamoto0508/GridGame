@@ -12,8 +12,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9f3515d42c7bac54b97326ee8352ae4e, type: 3}
   m_Name: ExplosionVisualSettings
   m_EditorClassIdentifier: Assembly-CSharp::ExplosionVisualSettings
-  _centerPrefab: {fileID: 8482292165910165399, guid: 6ef2efc0177b59f40a684b110072599e, type: 3}
-  _middlePrefab: {fileID: 7668013735683936945, guid: 6e1e098ee3c5d1f419e40a57b0903554, type: 3}
-  _endPrefab: {fileID: 1543558058330922319, guid: fa7a44c8d65880f4da0a8ab82cb021b6, type: 3}
-  _blockedEndPrefab: {fileID: 8294232777165737635, guid: d67dca97fe1dba54182705c3f28a1271, type: 3}
+  _centerPrefab: {fileID: 6879668596530315375, guid: d08996d1416821d41a91f53ddacf62bb, type: 3}
+  _middlePrefab: {fileID: 6061307151258835609, guid: e907ef44903644248b674b22339189c0, type: 3}
+  _endPrefab: {fileID: 5438150993462677075, guid: 04d7dc90635430845b167d82b273cc17, type: 3}
+  _blockedEndPrefab: {fileID: 1505383214774819227, guid: 92fb4ce398a842b4baa5365c05af8e18, type: 3}
   _effectDuration: 0.35
+  _scaleToCell: 0
