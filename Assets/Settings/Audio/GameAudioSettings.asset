@@ -111,3 +111,13 @@ MonoBehaviour:
     SpatialBlend: 0
     MinDistance: 3
     MaxDistance: 30
+  - Id: 9
+    Clips:
+    - {fileID: 8300000, guid: 85d34a4d71aa98b409596fea3de75662, type: 3}
+    Volume: 0.25
+    Pitch: 1
+    MaxVoices: 4
+    Cooldown: 0.04
+    SpatialBlend: 0
+    MinDistance: 3
+    MaxDistance: 30
