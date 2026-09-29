@@ -68,6 +68,9 @@ public class CharacterSpawner : MonoBehaviour
         if (_cinemaCamera != null)
         {
             _cinemaCamera.Target.TrackingTarget = player.transform;
+            // 既存Sceneにも自動で死亡演出を追加します。重複追加はしません。
+            if (!_cinemaCamera.TryGetComponent<CharacterDeathCameraShake>(out var deathShake))
+                deathShake = _cinemaCamera.gameObject.AddComponent<CharacterDeathCameraShake>();
             GridCameraSideController sideController = _cinemaCamera.GetComponent<GridCameraSideController>();
             if (sideController == null)
                 sideController = _cinemaCamera.gameObject.AddComponent<GridCameraSideController>();

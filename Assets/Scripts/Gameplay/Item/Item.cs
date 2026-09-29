@@ -67,6 +67,9 @@ public class Item : PooledGridObject
         _removed = true;
         _gridManager.TryUnregisterItem(GridPosition, this);
         inventory.Apply(_settings);
+        // 演出の失敗で取得処理やプール返却が止まらないよう分離します。
+        try { ItemPickupBurst.Spawn(character, _settings.Type); }
+        catch (System.Exception error) { Debug.LogException(error, this); }
         // Pool返却でItemが消えても、Manager側で音を最後まで再生します。
         AudioManager.PlayAt(SoundId.ItemCollect, transform.position);
         Debug.Log($"Item取得: {character.name}, {_settings.Type} +{_settings.IncreaseAmount}", character);

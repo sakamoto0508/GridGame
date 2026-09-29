@@ -1,0 +1,26 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: faecf620b9624d42b42b8bbaf461f131, type: 3}
+  m_Name: ItemPickupVisualSettings
+  m_EditorClassIdentifier: Assembly-CSharp::ItemPickupVisualSettings
+  Enabled: 1
+  Duration: 0.65
+  PowerColor: {r: 1.8, g: 1.3, b: 0.12, a: 1}
+  CountColor: {r: 0.15, g: 1.6, b: 0.8, a: 1}
+  StartRadius: 0.25
+  EndRadius: 0.85
+  RingWidth: 0.045
+  StartHeight: -0.3
+  RiseHeight: 0.65
+  ParticleCount: 18
+  ParticleSize: 0.055
+  ParticleRiseSpeed: 1.3
