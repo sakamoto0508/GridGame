@@ -14,6 +14,7 @@ public class StageSettings : ScriptableObject
 
     [Header("Generation")]
     [SerializeField, Range(0f, 1f)] private float _breakableBlockRate = 0.4f;
+    [Tooltip("Editorでの生成・事前配置用の固定シード。ビルド版では使わず、毎試合新しいシードを生成します。")]
     [SerializeField] private int _randomSeed = 12345;
     [SerializeField, Min(0)] private int _breakableBlockY = 1;
 

@@ -15,11 +15,13 @@ public class StageGenerator : MonoBehaviour
     [SerializeField] private StageSettings _settings;
     [SerializeField] private StageLightingSettings _lightingSettings;
     [SerializeField] private RooftopBackgroundSettings _backgroundSettings;
-    [Tooltip("設定するとランダム生成を行わず、この子に配置されたBlockを登録します。")]
+    [Tooltip("Editorでは子の配置済みBlockを登録します。ビルド版では試合開始時に配置済みBlockを非表示にし、毎回ランダム生成します。")]
     [SerializeField] private Transform _sceneBlocksRoot;
     public Transform SceneBlocksRoot => _sceneBlocksRoot;
     public RooftopBackgroundSettings BackgroundSettings => _backgroundSettings;
     private BoundaryVisibilityController _boundaryView;
+    /// <summary>今回の生成に使用したシード。ビルド版の配置を調査するときに使えます。</summary>
+    public int LastUsedSeed { get; private set; }
 
     /// <summary>背景は難易度選択中にも表示するため、試合開始を待たずに生成します。</summary>
     private void Start()
@@ -38,11 +40,41 @@ public class StageGenerator : MonoBehaviour
             return false;
         }
 
-        Random.InitState(_settings.RandomSeed);
+        // Editorでは事前配置と固定シードを維持し、ビルド版だけ毎試合作り直します。
+        bool useSceneBlocks = Application.isEditor && _sceneBlocksRoot != null;
+        if (!useSceneBlocks)
+        {
+            if (_settings.UnbreakableBlockPrefab == null ||
+                !_settings.UnbreakableBlockPrefab.HasSettings ||
+                _settings.UnbreakableBlockPrefab.Type != BlockType.Unbreakable ||
+                _settings.BreakableBlockPrefab == null ||
+                !_settings.BreakableBlockPrefab.HasSettings ||
+                _settings.BreakableBlockPrefab.Type != BlockType.Breakable)
+            {
+                Debug.LogError("ランダム生成にはStage Settingsに設定済みの外殻・破壊可能Block Prefabが必要です。", this);
+                return false;
+            }
+
+            if (_sceneBlocksRoot != null)
+            {
+                // 親に管理Objectが含まれている設定ミスでゲーム全体を無効化しないよう保護します。
+                if (transform.IsChildOf(_sceneBlocksRoot) || _gridManager.transform.IsChildOf(_sceneBlocksRoot))
+                {
+                    Debug.LogError("Scene Blocks Rootには管理Objectを含まない、配置済みBlock専用の親を指定してください。", this);
+                    return false;
+                }
+                // Sceneデータは消さず、今回の実行中だけ無効化して二重表示・Collider重複を防ぎます。
+                _sceneBlocksRoot.gameObject.SetActive(false);
+            }
+        }
+
+        LastUsedSeed = Application.isEditor ? _settings.RandomSeed : System.Guid.NewGuid().GetHashCode();
+        Random.InitState(LastUsedSeed);
+        Debug.Log($"Stage生成: Seed={LastUsedSeed}, 配置済みBlock使用={useSceneBlocks}", this);
         _boundaryView = GetComponent<BoundaryVisibilityController>();
         if (_boundaryView == null) _boundaryView = gameObject.AddComponent<BoundaryVisibilityController>();
         _boundaryView.Init(_gridManager);
-        if (_sceneBlocksRoot != null)
+        if (useSceneBlocks)
         {
             if (!RegisterSceneBlocks()) return false;
         }
@@ -51,7 +83,7 @@ public class StageGenerator : MonoBehaviour
         if (lighting == null) 
             lighting = gameObject.AddComponent<StageLightingController>();
         lighting.Init(_gridManager, _lightingSettings);
-        if (_sceneBlocksRoot == null) GenerateBreakableBlocks();
+        if (!useSceneBlocks) GenerateBreakableBlocks();
         return true;
     }
 
