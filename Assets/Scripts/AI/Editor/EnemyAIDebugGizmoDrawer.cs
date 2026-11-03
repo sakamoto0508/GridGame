@@ -6,7 +6,8 @@ using UnityEngine;
 /// EnemyBrainの危険予測・経路探索結果・状態をSceneビューへ描画します（Editor専用）。
 ///
 /// ・EnemyBrainの読み取り専用アクセサ（EnemyBrain.Debug.cs）だけを参照し、AIの判断には関与しません。
-/// ・[DrawGizmo]で描画するため、シーンやPrefabへのコンポーネント追加は不要です。
+/// ・[DrawGizmo]で描画するため、Enemy Prefabへのコンポーネント追加は不要です。
+/// ・表示のON/OFFはシーン上のEnemyAIDebugVisualizerのbool値で切り替えます。
 /// ・Editorフォルダ配下なのでビルドには含まれません。
 /// ・グリッド座標→ワールド座標の変換はGridManager.GetWorldPosition（セル中心）を使用します。
 ///
