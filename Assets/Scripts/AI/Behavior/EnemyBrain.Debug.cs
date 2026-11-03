@@ -33,7 +33,63 @@ public partial class EnemyBrain
 #endif
     }
 
+    /// <summary>Bomb設置判断の結果（デバッグ表示用）。</summary>
+    public enum DebugBombDecision
+    {
+        None,
+        Placed,
+        MaxBombCount,
+        ChanceFailed,
+        NoEscapeRoute,
+        PlaceFailed
+    }
+
+    /// <summary>
+    /// Bombを置いた／置かなかった理由を記録します。Editor以外では呼び出しごと削除されます。
+    /// デバッグ収集が有効な場合は、理由または位置が変わったときだけConsoleへ出力します。
+    /// </summary>
+    [System.Diagnostics.Conditional("UNITY_EDITOR")]
+    private void DebugRecordBombDecision(DebugBombDecision decision, PathSearchTrace escapeTrace)
+    {
 #if UNITY_EDITOR
+        Vector3Int position = _movement.CurrentGridPosition;
+        bool changed = decision != _debugBombDecision || position != _debugBombDecisionPosition;
+        _debugBombDecision = decision;
+        _debugBombDecisionPosition = position;
+        _debugBombDecisionTime = Time.time;
+
+        if (!changed || !PathSearchDebug.IsCollecting)
+            return;
+
+        string detail = "";
+        if (escapeTrace != null)
+        {
+            detail = $" (escape BFS expanded {escapeTrace.ExpandedCount}";
+            if (decision == DebugBombDecision.NoEscapeRoute)
+            {
+                var cells = new System.Text.StringBuilder();
+                int shown = Mathf.Min(escapeTrace.ExpandedNodes.Count, 12);
+                for (int i = 0; i < shown; i++)
+                    cells.Append(escapeTrace.ExpandedNodes[i].Position).Append(' ');
+                detail += $": {cells}";
+            }
+            detail += ")";
+        }
+
+        Vector3Int player = _playerMovement != null ? _playerMovement.CurrentGridPosition : default;
+        Debug.Log($"[AI Debug] Bomb decision at {position} (player {player}): {decision}{detail}", this);
+#endif
+    }
+
+#if UNITY_EDITOR
+    private DebugBombDecision _debugBombDecision;
+    private Vector3Int _debugBombDecisionPosition;
+    private float _debugBombDecisionTime;
+
+    /// <summary>直近のBomb設置判断の結果です。</summary>
+    public DebugBombDecision DebugLastBombDecision => _debugBombDecision;
+    public float DebugLastBombDecisionTime => _debugBombDecisionTime;
+
     private readonly List<PathSearchTrace> _debugSearchHistory = new();
 
     /// <summary>探索履歴（古い順）。保持数はPathSearchDebug.MaxHistoryPerEnemyまでです。</summary>

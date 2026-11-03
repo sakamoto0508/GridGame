@@ -34,6 +34,9 @@ internal static class EnemyAIDebugGizmoDrawer
     private static GUIStyle _stateStyle;
     private static GUIStyle _stepStyle;
 
+    // Play開始時のドメインリロードでfalseへ戻ります。
+    private static bool _loggedFirstCall;
+
     // 危険予測はどのEnemyでも同じ盤面から作られるため、重複描画を避けて1体分だけ描きます。
     private static EnemyBrain _dangerOwner;
 
@@ -64,7 +67,19 @@ internal static class EnemyAIDebugGizmoDrawer
     [DrawGizmo(GizmoType.Selected | GizmoType.NonSelected)]
     private static void DrawEnemyBrainGizmos(EnemyBrain brain, GizmoType gizmoType)
     {
-        if (!EditorApplication.isPlaying || !EnemyAIDebugSettings.Enabled)
+        if (!EditorApplication.isPlaying)
+            return;
+
+        // 「表示されない」ときの切り分け用に、Play開始後の最初の呼び出しで状態を1度だけ出力します。
+        // （このログ自体が出ない場合、UnityがSceneビューのGizmoを描画していません）
+        if (!_loggedFirstCall)
+        {
+            _loggedFirstCall = true;
+            Debug.Log($"[AI Debug] Scene gizmo drawer running: visualizerEnabled={EnemyAIDebugSettings.Enabled}, " +
+                      $"enemyReady={brain != null && brain.DebugIsReady}, collecting={PathSearchDebug.IsCollecting}");
+        }
+
+        if (!EnemyAIDebugSettings.Enabled)
             return;
         if (brain == null || !brain.isActiveAndEnabled || !brain.DebugIsReady)
             return;
@@ -388,6 +403,9 @@ internal static class EnemyAIDebugGizmoDrawer
     {
         string goal = GetGoalDescription(brain);
         string extra = brain.DebugIsWaitingForPlacedBlockJump ? "\n<i>waiting placed-block jump</i>" : "";
+        if (brain.DebugLastBombDecision != EnemyBrain.DebugBombDecision.None)
+            extra += $"\nBomb: {brain.DebugLastBombDecision} " +
+                     $"({Time.time - brain.DebugLastBombDecisionTime:0.0}s ago)";
         string text =
             $"<b>{brain.name}</b>  ({current.x},{current.y},{current.z})\n" +
             $"State: <b>{brain.CurrentState}</b>\n" +

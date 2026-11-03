@@ -178,11 +178,43 @@ internal sealed class PathSearchHistoryWindow : EditorWindow
                 EditorApplication.ExecuteMenuItem(VisualizerMenuPath);
         }
 
+        DrawStatusSection();
         DrawTargetSection();
         DrawHistorySection();
         DrawTraceSection();
 
         EditorGUILayout.EndScrollView();
+    }
+
+    /// <summary>「表示されない」ときに、どの前提条件が欠けているかを一覧で示します。</summary>
+    private void DrawStatusSection()
+    {
+        EditorGUILayout.Space();
+        EditorGUILayout.LabelField("Status", EditorStyles.boldLabel);
+
+        SceneView sceneView = SceneView.lastActiveSceneView;
+        bool brainGizmoEnabled = !GizmoUtility.TryGetGizmoInfo(typeof(EnemyBrain), out GizmoInfo info) ||
+                                 info.gizmoEnabled;
+
+        StatusLine("Play Mode", EditorApplication.isPlaying);
+        StatusLine("Visualizer in scene & Show Gizmos ON", EnemyAIDebugSettings.Enabled);
+        StatusLine("Recording search history", PathSearchDebug.IsCollecting);
+        StatusLine("Scene view open", sceneView != null);
+        StatusLine("Scene view Gizmos button ON", sceneView != null && sceneView.drawGizmos);
+        StatusLine("Gizmos menu: EnemyBrain checked", brainGizmoEnabled);
+        StatusLine("Enemy found & initialized", _brain != null && _brain.DebugIsReady);
+        if (_brain != null && EditorApplication.isPlaying)
+        {
+            EditorGUILayout.LabelField("Last bomb decision",
+                _brain.DebugLastBombDecision == EnemyBrain.DebugBombDecision.None
+                    ? "-"
+                    : $"{_brain.DebugLastBombDecision} ({Time.time - _brain.DebugLastBombDecisionTime:0.0}s ago)");
+        }
+    }
+
+    private static void StatusLine(string label, bool ok)
+    {
+        EditorGUILayout.LabelField(label, ok ? "✔ OK" : "✘ NG", ok ? EditorStyles.label : EditorStyles.boldLabel);
     }
 
     private void DrawTargetSection()

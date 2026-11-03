@@ -856,10 +856,16 @@ public partial class EnemyBrain : MonoBehaviour
     private bool TryPlaceBombByChance()
     {
         if (_bombComponent.CurrentBombCount >= _bombComponent.MaxBombCount)
+        {
+            DebugRecordBombDecision(DebugBombDecision.MaxBombCount, null);
             return false;
+        }
 
         if (Random.value > _difficultyValues.BombPlaceChance)
+        {
+            DebugRecordBombDecision(DebugBombDecision.ChanceFailed, null);
             return false;
+        }
 
         // Bombを仮置きした危険Mapで、安全地帯まで逃げ切れる場合だけ設置します。
         Vector3Int position = _movement.CurrentGridPosition;
@@ -870,6 +876,8 @@ public partial class EnemyBrain : MonoBehaviour
             _bombComponent.ExplosionPower,
             _bombComponent.FuseTime);
 
+        PathSearchTrace escapeTrace =
+            DebugBeginSearchTrace(PathSearchAlgorithm.Bfs, "Bomb Escape Check");
         List<Vector3Int> escapePath = GridPathfindingSystem.FindPathToNearestSafeCell(
             _gridManager,
             virtualDangerMap,
@@ -877,12 +885,18 @@ public partial class EnemyBrain : MonoBehaviour
             _movement.MoveDuration,
             _movement.JumpDuration,
             _difficultyValues.ActionInterval,
-            DebugBeginSearchTrace(PathSearchAlgorithm.Bfs, "Bomb Escape Check"));
+            escapeTrace);
 
         if (escapePath.Count < 2)
+        {
+            DebugRecordBombDecision(DebugBombDecision.NoEscapeRoute, escapeTrace);
             return false;
+        }
 
-        return _bombComponent.TryPlaceBomb();
+        bool placed = _bombComponent.TryPlaceBomb();
+        DebugRecordBombDecision(
+            placed ? DebugBombDecision.Placed : DebugBombDecision.PlaceFailed, escapeTrace);
+        return placed;
     }
 
     /// <summary>XYZ各軸の差を合計したグリッド上の距離を返します。</summary>
