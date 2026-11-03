@@ -403,7 +403,7 @@ internal static class EnemyAIDebugGizmoDrawer
     {
         string goal = GetGoalDescription(brain);
         string extra = brain.DebugIsWaitingForPlacedBlockJump ? "\n<i>waiting placed-block jump</i>" : "";
-        if (brain.DebugLastBombDecision != EnemyBrain.DebugBombDecision.None)
+        if (brain.DebugLastBombDecision != EnemyBrain.BombAttemptResult.None)
             extra += $"\nBomb: {brain.DebugLastBombDecision} " +
                      $"({Time.time - brain.DebugLastBombDecisionTime:0.0}s ago)";
         string text =
@@ -425,6 +425,9 @@ internal static class EnemyAIDebugGizmoDrawer
                     ? $"safe cell {Format(path[path.Count - 1])} [BFS, {path.Count} cells]"
                     : "none (waiting for safety / no BFS path)";
             }
+
+            case EnemyAIState.Chase when !brain.DebugHasAttackPlan:
+                return "approach player (greedy, outside A* detection)";
 
             case EnemyAIState.MoveToAttackPosition:
             case EnemyAIState.Chase:

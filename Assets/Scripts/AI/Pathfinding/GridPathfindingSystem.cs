@@ -32,13 +32,13 @@ public readonly struct GridPathStep
 /// GridDangerMapへ爆発時刻を問い合わせたうえで、通過するセルの一覧だけを返します。
 /// 実際にMoveまたはJumpを実行するのは、結果を受け取ったEnemyBrainです。
 ///
-/// 現在探索できる行動:
+/// Escape（BFS）で探索できる行動:
 /// ・同じ高さにある水平4方向への通常移動
 /// ・水平に隣接する1段高いBlock上へのジャンプ
+/// ・足場のない方向へ踏み出し、下の最初の足場まで飛び降りる移動
 ///
 /// Escapeで現在探索しない行動:
 /// ・斜め移動
-/// ・高い場所から低い場所への意図的な降下
 /// ・探索途中でのBlock設置
 /// ・Bomb設置
 ///
@@ -166,6 +166,7 @@ public static class GridPathfindingSystem
     /// <summary>
     /// PlayerへBombの爆風を届かせられるセルまで、A*で行動列を探索します。
     /// 通常移動、既存Blockへのジャンプ、経路中1回までのBlock設置後ジャンプを扱います。
+    /// excludedGoalを指定した場合、そのセルは攻撃位置（ゴール）として選びません。
     /// </summary>
     public static List<GridPathStep> FindPathToAttackPosition(
         GridManager gridManager,
@@ -178,6 +179,7 @@ public static class GridPathfindingSystem
         float jumpDuration,
         float fallDurationPerCell,
         float actionInterval,
+        Vector3Int? excludedGoal = null,
         PathSearchTrace trace = null)
     {
         List<GridPathStep> empty = new List<GridPathStep>();
@@ -218,7 +220,10 @@ public static class GridPathfindingSystem
                 current.Parent != null ? current.Step.Action : (GridPathActionType?)null,
                 current.VirtualBlock);
 
+            // excludedGoalは「到達できてもBombを置けない（逃げ道がない）」と判明した攻撃位置です。
+            // 通過は許可し、ゴールとしてだけ除外します。
             if (current.Position != start &&
+                (!excludedGoal.HasValue || current.Position != excludedGoal.Value) &&
                 !dangerMap.IsDangerous(current.Position) &&
                 ManhattanDistance(current.Position, playerPosition) <= bombDistance &&
                 CanExplosionReach(gridManager, current.Position, playerPosition, explosionPower))
@@ -406,9 +411,12 @@ public static class GridPathfindingSystem
     /// 戻り値にはstartを含みます。EnemyBrainは通常、index 1を次の移動先として使います。
     /// 安全セルへ到達できない場合、引数が不正な場合は空のListを返します。
     ///
-    /// moveDuration   : 通常移動1回の表示・行動時間
-    /// jumpDuration   : 1段ジャンプ1回の時間
-    /// actionInterval : Enemyが次の判断を行うまでの間隔
+    /// moveDuration        : 通常移動1回の表示・行動時間
+    /// jumpDuration        : 1段ジャンプ1回の時間
+    /// actionInterval      : Enemyが次の判断を行うまでの間隔
+    /// fallDurationPerCell : 飛び降り時の1段あたりの落下時間
+    ///
+    /// 飛び降りを含む経路では、着地セルのyが1つ前のセルより低くなります。
     /// </summary>
     public static List<Vector3Int> FindPathToNearestSafeCell(
         GridManager gridManager,
@@ -417,6 +425,7 @@ public static class GridPathfindingSystem
         float moveDuration = 0f,
         float jumpDuration = 0f,
         float actionInterval = 0f,
+        float fallDurationPerCell = 0f,
         PathSearchTrace trace = null)
     {
         // 失敗時にnullを返すと呼び出し側でnull判定が必要になるため、空Listで統一します。
@@ -513,6 +522,25 @@ public static class GridPathfindingSystem
                             dangerMap, jumpLanding, jumpArrival, actionInterval))
                     {
                         TryEnqueue(jumpLanding, current, jumpArrival,
+                            visited, previous, arrivalTimes, open);
+                    }
+                }
+
+                // 方向先に足場がない場合は、下の最初の足場まで飛び降りる逃走も候補にします。
+                // 所要時間はA*と同じく「1歩＋落下段数分の落下時間」とし、踏み出しセルから
+                // 着地セルまでの落下列すべてが通過時点で爆発前である場合だけ追加します。
+                if (GridGravitySystem.TryGetStepAndFallDestination(
+                        gridManager, current, direction,
+                        out Vector3Int fallEdge, out Vector3Int fallLanding))
+                {
+                    int fallDistance = fallEdge.y - fallLanding.y;
+                    float fallArrival = currentArrival + Mathf.Max(moveDuration, actionInterval) +
+                                        fallDurationPerCell * Mathf.Max(1, fallDistance);
+
+                    if (CanFallBeforeExplosion(
+                            dangerMap, fallEdge, fallLanding, fallArrival, actionInterval))
+                    {
+                        TryEnqueue(fallLanding, current, fallArrival,
                             visited, previous, arrivalTimes, open);
                     }
                 }

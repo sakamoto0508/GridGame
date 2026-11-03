@@ -65,6 +65,30 @@ public partial class EnemyBrain : MonoBehaviour
     private float _itemPlanUntil;
     private float _nextItemSearch;
 
+    /// <summary>Bomb設置を試みた結果です（判断とデバッグ表示の両方で使用）。</summary>
+    public enum BombAttemptResult
+    {
+        None,
+        Placed,
+        MaxBombCount,
+        ChanceFailed,
+        NoEscapeRoute,
+        PlaceFailed
+    }
+
+    // 一度検知したPlayerは、検知距離+この値を超えるまで見失わないようにします。
+    // 境界付近でA*接近とその他の行動が交互に切り替わる往復を防ぎます。
+    private const int DetectionLoseMargin = 2;
+    private bool _isPlayerDetected;
+
+    // 攻撃位置で確率判定に外れて待っている間は、意図した待機なので行き詰まりとして数えません。
+    private bool _isWaitingToBomb;
+    private Vector3Int _bombWaitPosition;
+
+    // Bombを置いても逃げ道がないと分かった攻撃位置は、一定時間A*のゴールから除外します。
+    private Vector3Int? _rejectedAttackCell;
+    private float _rejectedAttackCellUntil;
+
     [Header("Debug")]
     [SerializeField] private EnemyAIState _currentState = EnemyAIState.Idle;
 
@@ -134,6 +158,11 @@ public partial class EnemyBrain : MonoBehaviour
     {
         Vector3Int enemyPosition = _movement.CurrentGridPosition;
 
+        // 前回の思考で「攻撃位置でBomb設置待ち」だったかを読み取り、毎回リセットします。
+        // 今回も待機を続ける場合は、下の攻撃判断で再設定されます。
+        bool wasWaitingToBomb = _isWaitingToBomb && _bombWaitPosition == enemyPosition;
+        _isWaitingToBomb = false;
+
         // 行動するたびに現在のBomb配置から危険範囲を更新します。
         _dangerMap.Rebuild(_gridManager);
 
@@ -167,7 +196,12 @@ public partial class EnemyBrain : MonoBehaviour
         if (Time.time < _reconsiderUntil) return;
 
         // 移動せず同じセルで判断し続けた場合、通常ロジックを繰り返さず別方向を試します。
-        if (RegisterDecisionAndIsStuck(enemyPosition))
+        // ただし攻撃位置でのBomb設置待ちは意図した停止なので、行き詰まりに数えません。
+        if (wasWaitingToBomb)
+        {
+            ResetStuckCounter(enemyPosition);
+        }
+        else if (RegisterDecisionAndIsStuck(enemyPosition))
         {
             RecoverFromStuck(enemyPosition);
             return;
@@ -196,22 +230,39 @@ public partial class EnemyBrain : MonoBehaviour
         if (TryCollectItem(enemyPosition)) return;
 
         int distance = GetManhattanDistance(enemyPosition, playerPosition);
-        bool detectedPlayer = distance <= _difficultyValues.DetectionRange;
+        int detectionRange = _isPlayerDetected
+            ? _difficultyValues.DetectionRange + DetectionLoseMargin
+            : _difficultyValues.DetectionRange;
+        bool detectedPlayer = distance <= detectionRange;
+        _isPlayerDetected = detectedPlayer;
 
         // 現在位置のBombでPlayerへ爆風が届くなら、安全確認後に攻撃します。
         if (detectedPlayer &&
             distance <= _difficultyValues.BombDistance &&
+            !IsRejectedAttackCell(enemyPosition) &&
             CanBombHitPlayer(enemyPosition, playerPosition))
         {
             SetState(EnemyAIState.PlaceBomb);
 
-            if (TryPlaceBombByChance())
+            if (TryPlaceBombByChance(out BombAttemptResult result))
             {
                 ClearAttackPath();
                 SetState(EnemyAIState.Escape);
             }
-
-            // すでに攻撃位置なので、確率判定に外れた回に別の攻撃位置へ移動し直しません。
+            else if (result == BombAttemptResult.NoEscapeRoute)
+            {
+                // ここでは置けないので、次の思考からA*で別の攻撃位置を探します。
+                RejectAttackCell(enemyPosition);
+                ClearAttackPath();
+            }
+            else if (result == BombAttemptResult.ChanceFailed ||
+                     result == BombAttemptResult.MaxBombCount)
+            {
+                // すでに攻撃位置なので、確率判定に外れた回に別の攻撃位置へ移動し直しません。
+                // 設置失敗(PlaceFailed)は待っても解消しない可能性があるため、通常の行き詰まり判定に任せます。
+                _isWaitingToBomb = true;
+                _bombWaitPosition = enemyPosition;
+            }
             return;
         }
 
@@ -225,7 +276,7 @@ public partial class EnemyBrain : MonoBehaviour
 
             // 攻撃位置への経路がない場合だけ、その場のBlockを壊すBombを検討します。
             SetState(EnemyAIState.PlaceBomb);
-            if (TryPlaceBombByChance())
+            if (TryPlaceBombByChance(out _))
             {
                 ClearAttackPath();
                 SetState(EnemyAIState.Escape);
@@ -237,13 +288,11 @@ public partial class EnemyBrain : MonoBehaviour
             return;
         }
 
+        // 未検知時もPlayerの方向へ近づく順に候補を試します（判断ミス時はランダム順）。
         ClearAttackPath();
-        SetState(EnemyAIState.Idle);
+        SetState(EnemyAIState.Chase);
 
-        List<Vector3Int> candidates = CreateDirectionCandidates(
-            enemyPosition,
-            playerPosition,
-            detectedPlayer);
+        List<Vector3Int> candidates = CreateDirectionCandidates(enemyPosition, playerPosition);
 
         for (int i = 0; i < candidates.Count; i++)
         {
@@ -267,10 +316,38 @@ public partial class EnemyBrain : MonoBehaviour
         // 歩行・既存Blockへのジャンプで進めない場合だけ、足場を作って上ることを検討します。
         // 全方向を塞がれている場合は、Blockを壊すきっかけとしてBomb設置を試します。
         SetState(EnemyAIState.PlaceBomb);
-        if (TryPlaceBombByChance())
+        if (TryPlaceBombByChance(out _))
             SetState(EnemyAIState.Escape);
         else
-            SetState(detectedPlayer ? EnemyAIState.Chase : EnemyAIState.Idle);
+            SetState(EnemyAIState.Idle);
+    }
+
+    private bool IsRejectedAttackCell(Vector3Int position)
+    {
+        if (!_rejectedAttackCell.HasValue)
+            return false;
+
+        if (Time.time >= _rejectedAttackCellUntil)
+        {
+            _rejectedAttackCell = null;
+            return false;
+        }
+
+        return _rejectedAttackCell.Value == position;
+    }
+
+    private void RejectAttackCell(Vector3Int position)
+    {
+        _rejectedAttackCell = position;
+        _rejectedAttackCellUntil = Time.time + Mathf.Max(2f, _difficultyValues.ActionInterval * 4f);
+    }
+
+    /// <summary>有効期限内の除外攻撃位置を返します（A*のゴール除外用）。</summary>
+    private Vector3Int? GetActiveRejectedAttackCell()
+    {
+        if (_rejectedAttackCell.HasValue && Time.time >= _rejectedAttackCellUntil)
+            _rejectedAttackCell = null;
+        return _rejectedAttackCell;
     }
 
     /// <summary>
@@ -300,6 +377,7 @@ public partial class EnemyBrain : MonoBehaviour
                 _movement.JumpDuration,
                 _movement.FallDurationPerCell,
                 _difficultyValues.ActionInterval,
+                GetActiveRejectedAttackCell(),
                 DebugBeginSearchTrace(PathSearchAlgorithm.AStar, "Attack")));
         }
 
@@ -498,7 +576,7 @@ public partial class EnemyBrain : MonoBehaviour
 
     /// <summary>
     /// 最寄りの安全セルへの経路を探し、その最初の1セルへ移動します。
-    /// 次セルが1段高い場合は、通常移動ではなく段差ジャンプを要求します。
+    /// 次セルが1段高い場合は段差ジャンプ、低い場合は飛び降りを要求します。
     /// </summary>
     private bool TryEscapeDanger(Vector3Int enemyPosition)
     {
@@ -514,6 +592,7 @@ public partial class EnemyBrain : MonoBehaviour
                 _movement.MoveDuration,
                 _movement.JumpDuration,
                 _difficultyValues.ActionInterval,
+                _movement.FallDurationPerCell,
                 DebugBeginSearchTrace(PathSearchAlgorithm.Bfs, "Escape"));
 
             if (newPath.Count < 2)
@@ -547,6 +626,16 @@ public partial class EnemyBrain : MonoBehaviour
                 return true;
         }
 
+        // 次セルが低い場合は、BFSが選んだ飛び降り（踏み出して下の足場へ落下）を実行します。
+        if (difference.y < 0)
+        {
+            if (_movement.TryMoveAndFall(horizontalDirection))
+            {
+                RememberMove(enemyPosition);
+                return true;
+            }
+        }
+
         // 経路がBlockやBombで無効になった場合、次回の思考で再探索します。
         _escapePath.Clear();
         return false;
@@ -560,15 +649,15 @@ public partial class EnemyBrain : MonoBehaviour
     }
 
     /// <summary>
-    /// Player検知中は距離が縮む順、未検知または判断ミス時はランダム順を返します。
+    /// Playerとの距離が縮む順の移動候補を返します。判断ミス時はランダム順です。
+    /// （Player検知中はA*を使うため、この候補は主に未検知時の接近に使われます）
     /// </summary>
-    private List<Vector3Int> CreateDirectionCandidates(Vector3Int enemyPosition,Vector3Int playerPosition,
-                                                             bool detectedPlayer)
+    private List<Vector3Int> CreateDirectionCandidates(Vector3Int enemyPosition, Vector3Int playerPosition)
     {
         List<Vector3Int> candidates = new List<Vector3Int>(HorizontalDirections);
         bool makesMistake = Random.value < _difficultyValues.MistakeChance;
 
-        if (!detectedPlayer || makesMistake)
+        if (makesMistake)
         {
             Shuffle(candidates);
             MovePreviousCellToEnd(candidates, enemyPosition);
@@ -852,18 +941,23 @@ public partial class EnemyBrain : MonoBehaviour
         return false;
     }
 
-    /// <summary>最大数に達していなければ、難易度別確率でBomb設置を試します。</summary>
-    private bool TryPlaceBombByChance()
+    /// <summary>
+    /// 最大数に達していなければ、難易度別確率でBomb設置を試します。
+    /// resultで置かなかった理由を返します（攻撃位置での待機・除外判断に使用）。
+    /// </summary>
+    private bool TryPlaceBombByChance(out BombAttemptResult result)
     {
         if (_bombComponent.CurrentBombCount >= _bombComponent.MaxBombCount)
         {
-            DebugRecordBombDecision(DebugBombDecision.MaxBombCount, null);
+            result = BombAttemptResult.MaxBombCount;
+            DebugRecordBombDecision(result, null);
             return false;
         }
 
         if (Random.value > _difficultyValues.BombPlaceChance)
         {
-            DebugRecordBombDecision(DebugBombDecision.ChanceFailed, null);
+            result = BombAttemptResult.ChanceFailed;
+            DebugRecordBombDecision(result, null);
             return false;
         }
 
@@ -885,17 +979,19 @@ public partial class EnemyBrain : MonoBehaviour
             _movement.MoveDuration,
             _movement.JumpDuration,
             _difficultyValues.ActionInterval,
+            _movement.FallDurationPerCell,
             escapeTrace);
 
         if (escapePath.Count < 2)
         {
-            DebugRecordBombDecision(DebugBombDecision.NoEscapeRoute, escapeTrace);
+            result = BombAttemptResult.NoEscapeRoute;
+            DebugRecordBombDecision(result, escapeTrace);
             return false;
         }
 
         bool placed = _bombComponent.TryPlaceBomb();
-        DebugRecordBombDecision(
-            placed ? DebugBombDecision.Placed : DebugBombDecision.PlaceFailed, escapeTrace);
+        result = placed ? BombAttemptResult.Placed : BombAttemptResult.PlaceFailed;
+        DebugRecordBombDecision(result, escapeTrace);
         return placed;
     }
 

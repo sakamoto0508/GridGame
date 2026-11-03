@@ -206,7 +206,7 @@ internal sealed class PathSearchHistoryWindow : EditorWindow
         if (_brain != null && EditorApplication.isPlaying)
         {
             EditorGUILayout.LabelField("Last bomb decision",
-                _brain.DebugLastBombDecision == EnemyBrain.DebugBombDecision.None
+                _brain.DebugLastBombDecision == EnemyBrain.BombAttemptResult.None
                     ? "-"
                     : $"{_brain.DebugLastBombDecision} ({Time.time - _brain.DebugLastBombDecisionTime:0.0}s ago)");
         }

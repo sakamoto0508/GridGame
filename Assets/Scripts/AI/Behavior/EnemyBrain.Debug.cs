@@ -33,23 +33,12 @@ public partial class EnemyBrain
 #endif
     }
 
-    /// <summary>Bomb設置判断の結果（デバッグ表示用）。</summary>
-    public enum DebugBombDecision
-    {
-        None,
-        Placed,
-        MaxBombCount,
-        ChanceFailed,
-        NoEscapeRoute,
-        PlaceFailed
-    }
-
     /// <summary>
     /// Bombを置いた／置かなかった理由を記録します。Editor以外では呼び出しごと削除されます。
     /// デバッグ収集が有効な場合は、理由または位置が変わったときだけConsoleへ出力します。
     /// </summary>
     [System.Diagnostics.Conditional("UNITY_EDITOR")]
-    private void DebugRecordBombDecision(DebugBombDecision decision, PathSearchTrace escapeTrace)
+    private void DebugRecordBombDecision(BombAttemptResult decision, PathSearchTrace escapeTrace)
     {
 #if UNITY_EDITOR
         Vector3Int position = _movement.CurrentGridPosition;
@@ -65,7 +54,7 @@ public partial class EnemyBrain
         if (escapeTrace != null)
         {
             detail = $" (escape BFS expanded {escapeTrace.ExpandedCount}";
-            if (decision == DebugBombDecision.NoEscapeRoute)
+            if (decision == BombAttemptResult.NoEscapeRoute)
             {
                 var cells = new System.Text.StringBuilder();
                 int shown = Mathf.Min(escapeTrace.ExpandedNodes.Count, 12);
@@ -82,12 +71,12 @@ public partial class EnemyBrain
     }
 
 #if UNITY_EDITOR
-    private DebugBombDecision _debugBombDecision;
+    private BombAttemptResult _debugBombDecision;
     private Vector3Int _debugBombDecisionPosition;
     private float _debugBombDecisionTime;
 
     /// <summary>直近のBomb設置判断の結果です。</summary>
-    public DebugBombDecision DebugLastBombDecision => _debugBombDecision;
+    public BombAttemptResult DebugLastBombDecision => _debugBombDecision;
     public float DebugLastBombDecisionTime => _debugBombDecisionTime;
 
     private readonly List<PathSearchTrace> _debugSearchHistory = new();
