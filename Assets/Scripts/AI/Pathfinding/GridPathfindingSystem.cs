@@ -69,12 +69,17 @@ public static class GridPathfindingSystem
     public static List<GridPathStep> FindSafePathToItem(
         GridManager grid, GridDangerMap danger, Vector3Int start, Vector3Int goal,
         float moveDuration, float jumpDuration, float fallDuration, float interval,
-        out float totalTime)
+        out float totalTime, PathSearchTrace trace = null)
     {
         totalTime = float.PositiveInfinity;
         var empty = new List<GridPathStep>();
+        trace?.BeginSearch(start, goal);
         if (grid == null || danger == null || !grid.Contains(start) || !grid.Contains(goal) ||
-            danger.IsDangerous(start) || danger.IsDangerous(goal)) return empty;
+            danger.IsDangerous(start) || danger.IsDangerous(goal))
+        {
+            trace?.CompleteWithoutPath();
+            return empty;
+        }
         var open = new List<AttackNode> { new AttackNode { Position = start } };
         var costs = new Dictionary<Vector3Int, float> { [start] = 0f };
         while (open.Count > 0)
@@ -84,10 +89,15 @@ public static class GridPathfindingSystem
             AttackNode node = open[best];
             open.RemoveAt(best);
             if (node.Cost > costs[node.Position]) continue;
+            // 古いコストのまま残った重複エントリは上で読み飛ばすため、ここからが実際の展開です。
+            trace?.RecordExpanded(node.Position, node.Parent?.Position, node.Cost, 0f,
+                node.Parent != null ? node.Step.Action : (GridPathActionType?)null);
             if (node.Position == goal)
             {
                 totalTime = node.Cost;
-                return BuildAttackPath(node);
+                List<GridPathStep> itemPath = BuildAttackPath(node);
+                trace?.CompleteWithSteps(itemPath, node.Cost);
+                return itemPath;
             }
             foreach (Vector3Int direction in HorizontalDirections)
             {
@@ -107,6 +117,7 @@ public static class GridPathfindingSystem
                 open.Add(new AttackNode { Position = step.Position, Cost = cost, Parent = node, Step = step });
             }
         }
+        trace?.CompleteWithoutPath();
         return empty;
     }
 
@@ -166,11 +177,16 @@ public static class GridPathfindingSystem
         float moveDuration,
         float jumpDuration,
         float fallDurationPerCell,
-        float actionInterval)
+        float actionInterval,
+        PathSearchTrace trace = null)
     {
         List<GridPathStep> empty = new List<GridPathStep>();
+        trace?.BeginSearch(start, playerPosition);
         if (gridManager == null || dangerMap == null || !gridManager.Contains(start))
+        {
+            trace?.CompleteWithoutPath();
             return empty;
+        }
 
         List<AttackNode> open = new List<AttackNode>();
         Dictionary<string, float> bestCosts = new Dictionary<string, float>();
@@ -197,12 +213,20 @@ public static class GridPathfindingSystem
 
             AttackNode current = open[bestIndex];
             open.RemoveAt(bestIndex);
+            trace?.RecordExpanded(current.Position, current.Parent?.Position, current.Cost,
+                current.Score - current.Cost,
+                current.Parent != null ? current.Step.Action : (GridPathActionType?)null,
+                current.VirtualBlock);
 
             if (current.Position != start &&
                 !dangerMap.IsDangerous(current.Position) &&
                 ManhattanDistance(current.Position, playerPosition) <= bombDistance &&
                 CanExplosionReach(gridManager, current.Position, playerPosition, explosionPower))
-                return BuildAttackPath(current);
+            {
+                List<GridPathStep> attackPath = BuildAttackPath(current);
+                trace?.CompleteWithSteps(attackPath, current.Cost);
+                return attackPath;
+            }
 
             for (int i = 0; i < HorizontalDirections.Length; i++)
             {
@@ -261,6 +285,7 @@ public static class GridPathfindingSystem
             }
         }
 
+        trace?.CompleteWithoutPath();
         return empty;
     }
 
@@ -391,14 +416,19 @@ public static class GridPathfindingSystem
         Vector3Int start,
         float moveDuration = 0f,
         float jumpDuration = 0f,
-        float actionInterval = 0f)
+        float actionInterval = 0f,
+        PathSearchTrace trace = null)
     {
         // 失敗時にnullを返すと呼び出し側でnull判定が必要になるため、空Listで統一します。
         List<Vector3Int> emptyPath = new List<Vector3Int>();
+        trace?.BeginSearch(start, null);
 
         // 探索に必要な情報がなければ、盤面へアクセスせず終了します。
         if (gridManager == null || dangerMap == null || !gridManager.Contains(start))
+        {
+            trace?.CompleteWithoutPath();
             return emptyPath;
+        }
 
         // 探索待ちのセル:
         // これから隣接セルを調べる「探索待ちセル」のFIFOキューです。
@@ -431,10 +461,19 @@ public static class GridPathfindingSystem
             // 最も早くキューへ追加されたセルを1つ取り出します。
             Vector3Int current = open.Dequeue();
 
+            // デバッグ記録（traceがnullなら何もしません）。取り出した時点を「展開」とします。
+            trace?.RecordExpanded(current,
+                current == start ? (Vector3Int?)null : previous[current],
+                arrivalTimes[current], 0f);
+
             // start自身はEnemyが現在立っている危険セルなので、ゴールにはしません。
             // IsDangerous=falseは「どのBombの爆風予定にも含まれない」ことを意味します。
             if (current != start && !dangerMap.IsDangerous(current))
-                return BuildPath(previous, start, current);
+            {
+                List<Vector3Int> safePath = BuildPath(previous, start, current);
+                trace?.CompleteWithCells(safePath, arrivalTimes[current]);
+                return safePath;
+            }
 
             // currentから水平4方向へ進めるか、1方向ずつ調べます。
             for (int i = 0; i < HorizontalDirections.Length; i++)
@@ -481,6 +520,7 @@ public static class GridPathfindingSystem
         }
 
         // キューが空になった場合、現在の移動ルールでは安全セルへ到達できません。
+        trace?.CompleteWithoutPath();
         return emptyPath;
     }
 

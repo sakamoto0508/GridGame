@@ -299,7 +299,8 @@ public partial class EnemyBrain : MonoBehaviour
                 _movement.MoveDuration,
                 _movement.JumpDuration,
                 _movement.FallDurationPerCell,
-                _difficultyValues.ActionInterval));
+                _difficultyValues.ActionInterval,
+                DebugBeginSearchTrace(PathSearchAlgorithm.AStar, "Attack")));
         }
 
         if (_attackPath.Count == 0)
@@ -402,7 +403,8 @@ public partial class EnemyBrain : MonoBehaviour
                 List<GridPathStep> path = GridPathfindingSystem.FindSafePathToItem(
                     _gridManager, _dangerMap, current, position, _movement.MoveDuration,
                     _movement.JumpDuration, _movement.FallDurationPerCell,
-                    _difficultyValues.ActionInterval, out float travelTime);
+                    _difficultyValues.ActionInterval, out float travelTime,
+                    DebugBeginSearchTrace(PathSearchAlgorithm.Dijkstra, "Item"));
                 if (travelTime >= bestTime || travelTime > _difficultyValues.ItemPlanTimeout ||
                     (path.Count == 0 && position != current)) continue;
                 bestTime = travelTime;
@@ -511,7 +513,8 @@ public partial class EnemyBrain : MonoBehaviour
                 enemyPosition,
                 _movement.MoveDuration,
                 _movement.JumpDuration,
-                _difficultyValues.ActionInterval);
+                _difficultyValues.ActionInterval,
+                DebugBeginSearchTrace(PathSearchAlgorithm.Bfs, "Escape"));
 
             if (newPath.Count < 2)
                 return TryCreateEscapeStep(enemyPosition);
@@ -873,7 +876,8 @@ public partial class EnemyBrain : MonoBehaviour
             position,
             _movement.MoveDuration,
             _movement.JumpDuration,
-            _difficultyValues.ActionInterval);
+            _difficultyValues.ActionInterval,
+            DebugBeginSearchTrace(PathSearchAlgorithm.Bfs, "Bomb Escape Check"));
 
         if (escapePath.Count < 2)
             return false;

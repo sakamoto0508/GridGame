@@ -38,7 +38,7 @@ internal static class EnemyAIDebugGizmoDrawer
     private static EnemyBrain _dangerOwner;
 
     /// <summary>グリッド座標⇔ワールド座標の変換に必要な情報をまとめます。</summary>
-    private readonly struct GridSpace
+    internal readonly struct GridSpace
     {
         public readonly GridManager Grid;
         public readonly float CellSize;
@@ -277,7 +277,7 @@ internal static class EnemyAIDebugGizmoDrawer
     }
 
     /// <summary>1手分を行動種別ごとに描き分けます。</summary>
-    private static void DrawStep(GridSpace space, Vector3Int from, Vector3Int to,
+    internal static void DrawStep(GridSpace space, Vector3Int from, Vector3Int to,
         Vector3Int direction, GridPathActionType action, Color color, Vector3 offset,
         bool blockAlreadyPlaced = false)
     {
@@ -352,7 +352,7 @@ internal static class EnemyAIDebugGizmoDrawer
             color, null, LineWidth);
     }
 
-    private static void DrawGoalMarker(GridSpace space, Vector3Int cell, Color color,
+    internal static void DrawGoalMarker(GridSpace space, Vector3Int cell, Color color,
         Vector3 offset, string label)
     {
         Vector3 center = space.Center(cell) + offset;
@@ -369,7 +369,7 @@ internal static class EnemyAIDebugGizmoDrawer
     }
 
     /// <summary>セル底面からy=0の床まで点線を下ろし、空中のセルの高さを示します。</summary>
-    private static void DrawHeightGuide(GridSpace space, Vector3Int cell)
+    internal static void DrawHeightGuide(GridSpace space, Vector3Int cell)
     {
         Vector3 bottom = space.Bottom(cell);
         Vector3 floor = space.Floor(cell);
@@ -433,7 +433,7 @@ internal static class EnemyAIDebugGizmoDrawer
 
     private static string Format(Vector3Int p) => $"({p.x},{p.y},{p.z})";
 
-    private static void EnsureStyles()
+    internal static void EnsureStyles()
     {
         if (_timerStyle == null)
         {
