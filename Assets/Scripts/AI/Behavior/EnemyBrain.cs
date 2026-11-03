@@ -20,7 +20,7 @@ public enum EnemyAIState
 [RequireComponent(typeof(MovementComponent))]
 [RequireComponent(typeof(BombComponent))]
 [RequireComponent(typeof(BlockPlacementComponent))]
-public class EnemyBrain : MonoBehaviour
+public partial class EnemyBrain : MonoBehaviour
 {
     /// <summary>現在の状態です。実行中はInspectorからも確認できます。</summary>
     public EnemyAIState CurrentState => _currentState;
