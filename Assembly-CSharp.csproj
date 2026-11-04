@@ -60,6 +60,7 @@
     <Compile Include="Assets\Scripts\Core\Manager\GridManager.cs" />
     <Compile Include="Assets\Scripts\Character\Common\CharacterBase.cs" />
     <Compile Include="Assets\Scripts\Gameplay\Item\Item.cs" />
+    <Compile Include="Assets\Scripts\AI\Behavior\EnemyBrain.Debug.cs" />
     <Compile Include="Assets\Scripts\Character\Components\LifeComponent.cs" />
     <Compile Include="Assets\Scripts\Gameplay\Stage\StageLightingController.cs" />
     <Compile Include="Assets\Scripts\Gameplay\Block\BlockOutlineView.cs" />
@@ -70,6 +71,7 @@
     <Compile Include="Assets\Scripts\Core\Grid\GridUtility.cs" />
     <Compile Include="Assets\Scripts\Character\Components\BombComponent.cs" />
     <Compile Include="Assets\Scripts\Gameplay\EndPhase\EndPhaseSettings.cs" />
+    <Compile Include="Assets\Scripts\AI\Debugging\EnemyAIDebugVisualizer.cs" />
     <Compile Include="Assets\Scripts\Gameplay\Block\Data\BlockSettings.cs" />
     <Compile Include="Assets\Scripts\Gameplay\Block\Block.cs" />
     <Compile Include="Assets\Scripts\Character\Data\CharacterPrefabSettings.cs" />
@@ -88,6 +90,7 @@
     <Compile Include="Assets\Scripts\Camera\CharacterDeathCameraShake.cs" />
     <Compile Include="Assets\Scripts\AI\Behavior\EnemyDifficulty.cs" />
     <Compile Include="Assets\Scripts\Character\Components\MovementComponent.cs" />
+    <Compile Include="Assets\Scripts\AI\Pathfinding\PathSearchTrace.cs" />
     <Compile Include="Assets\Scripts\Character\Components\CharacterDeathBurst.cs" />
     <Compile Include="Assets\Scripts\Gameplay\Item\ItemPickupVisualSettings.cs" />
     <Compile Include="Assets\Scripts\Gameplay\Item\NeonItemView.cs" />
