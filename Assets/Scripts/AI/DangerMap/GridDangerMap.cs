@@ -14,6 +14,14 @@ public sealed class GridDangerMap
     private readonly Dictionary<Vector3Int, float> _dangerTimes = new();
     public IReadOnlyDictionary<Vector3Int, float> DangerTimes => _dangerTimes;
 
+#if UNITY_EDITOR
+    /// <summary>
+    /// 直近のRebuild時刻（Time.time）。DangerTimesはこの時刻からの相対秒なので、
+    /// デバッグ表示で「現在から何秒後か」を求める基準に使います。Editor専用です。
+    /// </summary>
+    public float DebugBuiltAt { get; private set; }
+#endif
+
     public void Rebuild(GridManager gridManager) => Rebuild(gridManager, null, 0, 0f);
 
     /// <summary>未設置のBombを加え、設置後に逃げられるか判断するMapを作ります。</summary>
@@ -51,6 +59,9 @@ public sealed class GridDangerMap
         GridManager gridManager, Vector3Int? virtualPosition, int virtualPower, float virtualFuseTime)
     {
         _dangerTimes.Clear();
+#if UNITY_EDITOR
+        DebugBuiltAt = Time.time;
+#endif
         if (gridManager == null)
             return;
 
