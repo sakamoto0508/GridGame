@@ -34,11 +34,14 @@ internal static class EnemyAIDebugGizmoDrawer
     private static GUIStyle _stateStyle;
     private static GUIStyle _stepStyle;
 
+    // Play開始時のドメインリロードでfalseへ戻ります。
+    private static bool _loggedFirstCall;
+
     // 危険予測はどのEnemyでも同じ盤面から作られるため、重複描画を避けて1体分だけ描きます。
     private static EnemyBrain _dangerOwner;
 
     /// <summary>グリッド座標⇔ワールド座標の変換に必要な情報をまとめます。</summary>
-    private readonly struct GridSpace
+    internal readonly struct GridSpace
     {
         public readonly GridManager Grid;
         public readonly float CellSize;
@@ -64,7 +67,19 @@ internal static class EnemyAIDebugGizmoDrawer
     [DrawGizmo(GizmoType.Selected | GizmoType.NonSelected)]
     private static void DrawEnemyBrainGizmos(EnemyBrain brain, GizmoType gizmoType)
     {
-        if (!EditorApplication.isPlaying || !EnemyAIDebugSettings.Enabled)
+        if (!EditorApplication.isPlaying)
+            return;
+
+        // 「表示されない」ときの切り分け用に、Play開始後の最初の呼び出しで状態を1度だけ出力します。
+        // （このログ自体が出ない場合、UnityがSceneビューのGizmoを描画していません）
+        if (!_loggedFirstCall)
+        {
+            _loggedFirstCall = true;
+            Debug.Log($"[AI Debug] Scene gizmo drawer running: visualizerEnabled={EnemyAIDebugSettings.Enabled}, " +
+                      $"enemyReady={brain != null && brain.DebugIsReady}, collecting={PathSearchDebug.IsCollecting}");
+        }
+
+        if (!EnemyAIDebugSettings.Enabled)
             return;
         if (brain == null || !brain.isActiveAndEnabled || !brain.DebugIsReady)
             return;
@@ -277,7 +292,7 @@ internal static class EnemyAIDebugGizmoDrawer
     }
 
     /// <summary>1手分を行動種別ごとに描き分けます。</summary>
-    private static void DrawStep(GridSpace space, Vector3Int from, Vector3Int to,
+    internal static void DrawStep(GridSpace space, Vector3Int from, Vector3Int to,
         Vector3Int direction, GridPathActionType action, Color color, Vector3 offset,
         bool blockAlreadyPlaced = false)
     {
@@ -352,7 +367,7 @@ internal static class EnemyAIDebugGizmoDrawer
             color, null, LineWidth);
     }
 
-    private static void DrawGoalMarker(GridSpace space, Vector3Int cell, Color color,
+    internal static void DrawGoalMarker(GridSpace space, Vector3Int cell, Color color,
         Vector3 offset, string label)
     {
         Vector3 center = space.Center(cell) + offset;
@@ -369,7 +384,7 @@ internal static class EnemyAIDebugGizmoDrawer
     }
 
     /// <summary>セル底面からy=0の床まで点線を下ろし、空中のセルの高さを示します。</summary>
-    private static void DrawHeightGuide(GridSpace space, Vector3Int cell)
+    internal static void DrawHeightGuide(GridSpace space, Vector3Int cell)
     {
         Vector3 bottom = space.Bottom(cell);
         Vector3 floor = space.Floor(cell);
@@ -388,6 +403,9 @@ internal static class EnemyAIDebugGizmoDrawer
     {
         string goal = GetGoalDescription(brain);
         string extra = brain.DebugIsWaitingForPlacedBlockJump ? "\n<i>waiting placed-block jump</i>" : "";
+        if (brain.DebugLastBombDecision != EnemyBrain.BombAttemptResult.None)
+            extra += $"\nBomb: {brain.DebugLastBombDecision} " +
+                     $"({Time.time - brain.DebugLastBombDecisionTime:0.0}s ago)";
         string text =
             $"<b>{brain.name}</b>  ({current.x},{current.y},{current.z})\n" +
             $"State: <b>{brain.CurrentState}</b>\n" +
@@ -407,6 +425,9 @@ internal static class EnemyAIDebugGizmoDrawer
                     ? $"safe cell {Format(path[path.Count - 1])} [BFS, {path.Count} cells]"
                     : "none (waiting for safety / no BFS path)";
             }
+
+            case EnemyAIState.Chase when !brain.DebugHasAttackPlan:
+                return "approach player (greedy, outside A* detection)";
 
             case EnemyAIState.MoveToAttackPosition:
             case EnemyAIState.Chase:
@@ -433,7 +454,7 @@ internal static class EnemyAIDebugGizmoDrawer
 
     private static string Format(Vector3Int p) => $"({p.x},{p.y},{p.z})";
 
-    private static void EnsureStyles()
+    internal static void EnsureStyles()
     {
         if (_timerStyle == null)
         {

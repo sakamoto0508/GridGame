@@ -41,6 +41,14 @@ public sealed class EnemyAIDebugVisualizer : MonoBehaviour
     [Tooltip("Hierarchyで選択中のEnemyだけを表示します。")]
     [SerializeField] private bool _selectedEnemyOnly;
 
+    [Header("Search History (Phase 2)")]
+    [Tooltip("BFS・A*・Dijkstraの展開ノードを記録します。OFFまたはShow Gizmos OFFの間は一切収集しません。")]
+    [SerializeField] private bool _recordSearchHistory = true;
+    [Tooltip("Enemy 1体あたりに保持する探索履歴の最大数です。超えた分は古い順に破棄します。")]
+    [SerializeField, Range(1, 64)] private int _maxHistoryPerEnemy = 16;
+    [Tooltip("1回の探索で記録する展開ノードの最大数です。展開数の統計は上限を超えても正確に数えます。")]
+    [SerializeField, Range(64, 8192)] private int _maxNodesPerSearch = 2048;
+
     public bool ShowGizmos => _showGizmos;
     public bool ShowDangerCells => _showDangerCells;
     public bool ShowDangerTimers => _showDangerTimers;
@@ -52,8 +60,28 @@ public sealed class EnemyAIDebugVisualizer : MonoBehaviour
     public bool DangerNearEnemyHeightOnly => _dangerNearEnemyHeightOnly;
     public bool SelectedEnemyOnly => _selectedEnemyOnly;
 
+    public bool RecordSearchHistory => _recordSearchHistory;
+    public int MaxHistoryPerEnemy => _maxHistoryPerEnemy;
+    public int MaxNodesPerSearch => _maxNodesPerSearch;
+
 #if UNITY_EDITOR
+    // 探索履歴の収集設定はEditor上でのみ共有設定へ反映します。ビルドでは収集は常に無効です。
+    private void OnEnable() => ApplySearchHistorySettings();
+
+    private void OnDisable() => PathSearchDebug.IsCollecting = false;
+
     // Inspectorでチェックを切り替えた直後にSceneビューへ反映します。
-    private void OnValidate() => UnityEditor.SceneView.RepaintAll();
+    private void OnValidate()
+    {
+        ApplySearchHistorySettings();
+        UnityEditor.SceneView.RepaintAll();
+    }
+
+    private void ApplySearchHistorySettings()
+    {
+        PathSearchDebug.IsCollecting = isActiveAndEnabled && _showGizmos && _recordSearchHistory;
+        PathSearchDebug.MaxHistoryPerEnemy = _maxHistoryPerEnemy;
+        PathSearchDebug.MaxNodesPerTrace = _maxNodesPerSearch;
+    }
 #endif
 }
