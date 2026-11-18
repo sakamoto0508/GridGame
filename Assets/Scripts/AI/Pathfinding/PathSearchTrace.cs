@@ -57,10 +57,6 @@ public readonly struct PathSearchNodeRecord
 
 /// <summary>
 /// 1回の経路探索の履歴（展開ノード・最終経路・統計）です。
-///
-/// 探索関数は引数でこのインスタンスを受け取った場合だけ記録し、nullなら一切記録しません。
-/// 記録は探索結果や探索順序に影響しない「追記のみ」の操作で、描画処理は持ちません。
-/// メモリ使用量を抑えるため、記録するノード数には上限があります（ExpandedCountは上限を超えても正確に数えます）。
 /// </summary>
 public sealed class PathSearchTrace
 {

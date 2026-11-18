@@ -7,12 +7,17 @@ public class ItemManager : MonoBehaviour
     [SerializeField] private ItemDropSettings _settings;
     [SerializeField] private GridManager _gridManager;
     [SerializeField] private GridBomberGameState _gameState;
+
     private float _elapsed;
 
     private void Start()
     {
-        if (_gridManager == null) _gridManager = FindFirstObjectByType<GridManager>();
-        if (_gameState == null) _gameState = FindFirstObjectByType<GridBomberGameState>();
+        if (_gridManager == null)
+            _gridManager = FindFirstObjectByType<GridManager>();
+
+        if (_gameState == null)
+            _gameState = FindFirstObjectByType<GridBomberGameState>();
+
         if (_settings == null || _gridManager == null || _gameState == null)
         {
             Debug.LogError("ItemManagerにSettings、GridManager、GameStateが必要です。", this);
@@ -22,9 +27,16 @@ public class ItemManager : MonoBehaviour
 
     private void Update()
     {
-        if (_gameState.State != MatchState.Playing) { _elapsed = 0f; return; }
+        if (_gameState.State != MatchState.Playing)
+        {
+            _elapsed = 0f;
+            return;
+        }
+
         _elapsed += Time.deltaTime;
-        if (_elapsed < _settings.DropInterval) return;
+        if (_elapsed < _settings.DropInterval)
+            return;
+
         _elapsed = 0f;
         TryDropItem();
     }
@@ -34,25 +46,52 @@ public class ItemManager : MonoBehaviour
     {
         if (_settings == null || _gridManager == null || _gameState == null ||
             _gameState.State != MatchState.Playing ||
-            _gridManager.CountItems() >= _settings.MaxItemCount) return false;
+            _gridManager.CountItems() >= _settings.MaxItemCount)
+            return false;
+
+        // 抽選対象のPrefab（未設定の要素は除外）
         List<Item> prefabs = new List<Item>();
         if (_settings.Prefabs != null)
+        {
             foreach (Item prefab in _settings.Prefabs)
-                if (prefab != null) prefabs.Add(prefab);
-        if (prefabs.Count == 0) return false;
+            {
+                if (prefab != null)
+                    prefabs.Add(prefab);
+            }
+        }
+
+        if (prefabs.Count == 0)
+            return false;
+
+        // 最上段で配置できるセルを候補にします。
         List<Vector3Int> candidates = new List<Vector3Int>();
         Vector3Int size = _gridManager.Size;
+        int topY = size.y - 1;
+
         for (int x = 0; x < size.x; x++)
-        for (int z = 0; z < size.z; z++)
         {
-            Vector3Int cell = new Vector3Int(x, size.y - 1, z);
-            if (_gridManager.CanPlaceItem(cell)) candidates.Add(cell);
+            for (int z = 0; z < size.z; z++)
+            {
+                Vector3Int cell = new Vector3Int(x, topY, z);
+                if (_gridManager.CanPlaceItem(cell))
+                    candidates.Add(cell);
+            }
         }
-        if (candidates.Count == 0) return false;
+
+        if (candidates.Count == 0)
+            return false;
+
         Vector3Int position = candidates[Random.Range(0, candidates.Count)];
-        Item item = GridObjectPool.For(_gridManager).Rent(prefabs[Random.Range(0, prefabs.Count)],
-            _gridManager.GetWorldPosition(position), Quaternion.identity);
-        if (item.Init(_gridManager, position)) return true;
+        Item prefabToDrop = prefabs[Random.Range(0, prefabs.Count)];
+
+        Item item = GridObjectPool.For(_gridManager).Rent(
+            prefabToDrop,
+            _gridManager.GetWorldPosition(position),
+            Quaternion.identity);
+
+        if (item.Init(_gridManager, position))
+            return true;
+
         item.Despawn();
         return false;
     }

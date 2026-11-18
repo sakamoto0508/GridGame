@@ -28,7 +28,7 @@ public class CharacterSpawner : MonoBehaviour
 
         if (movement == null || !movement.Init(_gridManager, gridPosition))
         {
-            Debug.LogError($"Playerのグリッド登録に失敗しました: Cell={gridPosition}", player);
+            Debug.LogError($"Playerのグリッド登録に失敗しました: セル={gridPosition}", player);
             Destroy(player.gameObject);
             return null;
         }
@@ -68,22 +68,26 @@ public class CharacterSpawner : MonoBehaviour
         if (_cinemaCamera != null)
         {
             _cinemaCamera.Target.TrackingTarget = player.transform;
+
             // 既存Sceneにも自動で死亡演出を追加します。重複追加はしません。
             if (!_cinemaCamera.TryGetComponent<CharacterDeathCameraShake>(out var deathShake))
                 deathShake = _cinemaCamera.gameObject.AddComponent<CharacterDeathCameraShake>();
+
             GridCameraSideController sideController = _cinemaCamera.GetComponent<GridCameraSideController>();
             if (sideController == null)
                 sideController = _cinemaCamera.gameObject.AddComponent<GridCameraSideController>();
+
             if (sideController.Init() && controller != null)
                 controller.InitCameraSideController(sideController);
         }
+
         return player;
     }
 
     /// <summary>
     /// Enemyを生成して共通Componentと簡易AIを初期化します。
     /// </summary>
-    public EnemyCharacter SpawnTestEnemy(
+    public EnemyCharacter SpawnEnemy(
         Vector3Int gridPosition,
         CharacterBase player,
         EnemyDifficulty difficulty,
@@ -92,7 +96,7 @@ public class CharacterSpawner : MonoBehaviour
         if (_gridManager == null || _settings == null || _settings.EnemyPrefab == null)
         {
             Debug.LogError(
-                "Test Enemyを生成できません: GridManagerまたはTest Enemy Prefabが未設定です。",
+                "Enemyを生成できません: GridManagerまたはEnemy Prefabが未設定です。",
                 this);
             return null;
         }
@@ -117,7 +121,7 @@ public class CharacterSpawner : MonoBehaviour
 
         if (movement == null || !movement.Init(_gridManager, gridPosition))
         {
-            Debug.LogError($"Test Enemyのグリッド登録に失敗しました: Cell={gridPosition}", enemy);
+            Debug.LogError($"Enemyのグリッド登録に失敗しました: セル={gridPosition}", enemy);
             Destroy(enemy.gameObject);
             return null;
         }
@@ -125,7 +129,7 @@ public class CharacterSpawner : MonoBehaviour
         if (bombComponent == null || blockPlacement == null || enemyBrain == null)
         {
             Debug.LogError(
-                "Test EnemyにBombComponent、BlockPlacementComponent、EnemyBrainのいずれかがありません。Enemy Prefabを確認してください。",
+                "EnemyにBombComponent、BlockPlacementComponent、EnemyBrainのいずれかがありません。Enemy Prefabを確認してください。",
                 enemy);
             movement.UnregisterFromGrid();
             Destroy(enemy.gameObject);
@@ -143,7 +147,7 @@ public class CharacterSpawner : MonoBehaviour
         }
 
         Debug.Log(
-            $"Test Enemyを生成しました: Cell={gridPosition}, Difficulty={difficulty}",
+            $"Enemyを生成しました: セル={gridPosition}、難易度={difficulty}",
             enemy);
         return enemy;
     }

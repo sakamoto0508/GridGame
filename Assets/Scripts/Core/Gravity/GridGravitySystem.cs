@@ -31,6 +31,8 @@ public static class GridGravitySystem
             if (gridManager.HasBlock(below))
             {
                 landingPosition = cursor;
+
+                // 踏み出した先に足場がある（落下しない）場合は通常移動なのでfalseにします。
                 return landingPosition.y < edgePosition.y;
             }
 
@@ -51,58 +53,30 @@ public static class GridGravitySystem
     /// Characterは落下を妨げず、通過時にBlock側で押し潰し判定を行います。
     /// </summary>
     public static bool TryGetBlockFallDestination(
-        GridManager gridManager,
-        Vector3Int startPosition,
-        out Vector3Int destination)
-    {
-        destination = startPosition;
+        GridManager gridManager, Vector3Int startPosition, out Vector3Int destination)
+        => TryGetDropDestination(gridManager, startPosition, (grid, p) => grid.CanFallingBlockEnter(p), out destination);
 
-        if (gridManager == null || !gridManager.Contains(startPosition))
-            return false;
-
-        Vector3Int nextPosition = startPosition + Vector3Int.down;
-
-        while (gridManager.Contains(nextPosition) &&
-               gridManager.CanFallingBlockEnter(nextPosition))
-        {
-            destination = nextPosition;
-            nextPosition += Vector3Int.down;
-        }
-
-        return destination != startPosition;
-    }
-
-    /// <summary>
-    /// 開始セルから真下を探索し、最初の障害物の1セル上を着地点として返します。
-    /// 1セル以上落下できる場合だけtrueを返します。
-    /// </summary>
-    public static bool TryGetFallDestination(GridManager gridManager,Vector3Int startPosition,
-        out Vector3Int destination)
-    {
-        destination = startPosition;
-
-        if (gridManager == null || !gridManager.Contains(startPosition))
-            return false;
-
-        Vector3Int nextPosition = startPosition + Vector3Int.down;
-
-        // 下のセルが空いている間、グリッド最下部まで1セルずつ探索します。
-        while (gridManager.Contains(nextPosition) && gridManager.CanEnter(nextPosition))
-        {
-            destination = nextPosition;
-            nextPosition += Vector3Int.down;
-        }
-
-        return destination != startPosition;
-    }
+    /// <summary>Characterの落下先です。Bombのあるセルにも落ちられます（GridCell.IsWalkable）。</summary>
+    public static bool TryGetFallDestination(
+        GridManager gridManager, Vector3Int startPosition, out Vector3Int destination)
+        => TryGetDropDestination(gridManager, startPosition, (grid, p) => grid.CanEnter(p), out destination);
 
     /// <summary>
     /// Bomb専用の配置条件を使って、真下の着地可能セルを返します。
     /// BombはCharacterと同じセルへ存在できますが、Blockや別Bombは通過できません。
     /// </summary>
     public static bool TryGetBombFallDestination(
+        GridManager gridManager, Vector3Int startPosition, out Vector3Int destination)
+        => TryGetDropDestination(gridManager, startPosition, (grid, p) => grid.CanPlaceBomb(p), out destination);
+
+    /// <summary>
+    /// 開始セルから真下へ、canEnterを満たす間だけ1セルずつ進み、最後に入れたセルを着地点とします。
+    /// 1セル以上落下できる場合だけtrueを返します。グリッド外は各判定がfalseを返すため、そこで止まります。
+    /// </summary>
+    private static bool TryGetDropDestination(
         GridManager gridManager,
         Vector3Int startPosition,
+        System.Func<GridManager, Vector3Int, bool> canEnter,
         out Vector3Int destination)
     {
         destination = startPosition;
@@ -112,8 +86,7 @@ public static class GridGravitySystem
 
         Vector3Int nextPosition = startPosition + Vector3Int.down;
 
-        while (gridManager.Contains(nextPosition) &&
-               gridManager.CanPlaceBomb(nextPosition))
+        while (canEnter(gridManager, nextPosition))
         {
             destination = nextPosition;
             nextPosition += Vector3Int.down;

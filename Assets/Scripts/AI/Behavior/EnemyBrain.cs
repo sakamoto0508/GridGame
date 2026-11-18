@@ -22,48 +22,23 @@ public enum EnemyAIState
 [RequireComponent(typeof(BlockPlacementComponent))]
 public partial class EnemyBrain : MonoBehaviour
 {
-    /// <summary>現在の状態です。実行中はInspectorからも確認できます。</summary>
-    public EnemyAIState CurrentState => _currentState;
+    // 逃げ道がない攻撃位置をA*のゴールから外す時間（最低秒数と、行動間隔の何回分か）
+    private const float MinRejectedAttackCellSeconds = 2f;
+    private const float RejectedAttackCellActionIntervals = 4f;
 
-    private static readonly Vector3Int[] HorizontalDirections =
-    {
-        Vector3Int.right,
-        Vector3Int.left,
-        Vector3Int.forward,
-        Vector3Int.back
-    };
+    // 2セル往復を検知したセルを避ける時間（最低秒数と、行動間隔の何回分か）
+    private const float MinOscillationAvoidanceSeconds = 0.5f;
+    private const float OscillationAvoidanceActionIntervals = 3f;
 
-    private GridManager _gridManager;
-    private CharacterBase _player;
-    private EnemyCharacter _enemy;
-    private MovementComponent _movement;
-    private BombComponent _bombComponent;
-    private BlockPlacementComponent _blockPlacement;
-    private MovementComponent _playerMovement;
-    private EnemyDifficultyValues _difficultyValues;
-    private readonly GridDangerMap _dangerMap = new GridDangerMap();
-    private readonly List<Vector3Int> _escapePath = new List<Vector3Int>();
-    private readonly List<GridPathStep> _attackPath = new List<GridPathStep>();
-    private Vector3Int _plannedPlayerPosition;
-    private bool _hasAttackPlan;
-    private bool _isWaitingForPlacedBlockJump;
-    private Vector3Int? _previousPosition;
-    private Vector3Int? _positionBeforePrevious;
-    private Vector3Int? _temporarilyAvoidedCell;
-    private float _avoidCellUntil;
-    private Vector3Int _lastDecisionPosition;
-    private int _sameCellDecisionCount;
-    private float _reconsiderUntil;
-    private bool _hasDecisionPosition;
-    private float _escapeSafeSince = -1f;
-    private float _nextActionTime;
-    private bool _isInitialized;
-    private Item _itemTarget;
-    private int _itemTargetVersion;
-    private Vector3Int _itemTargetPosition;
-    private readonly List<GridPathStep> _itemPath = new();
-    private float _itemPlanUntil;
-    private float _nextItemSearch;
+    /// <summary>逃走用Block設置＋ジャンプが爆発に間に合うかを判定するときの余裕（秒）です。</summary>
+    private const float JumpDangerMarginSeconds = 0.05f;
+
+    // 一度検知したPlayerは、検知距離+この値を超えるまで見失わないようにします。
+    // 境界付近でA*接近とその他の行動が交互に切り替わる往復を防ぎます。
+    private const int DetectionLoseMargin = 2;
+
+    /// <summary>「未計測」を表すEscape安全確認の開始時刻です。</summary>
+    private const float NotMeasured = -1f;
 
     /// <summary>Bomb設置を試みた結果です（判断とデバッグ表示の両方で使用）。</summary>
     public enum BombAttemptResult
@@ -76,9 +51,51 @@ public partial class EnemyBrain : MonoBehaviour
         PlaceFailed
     }
 
-    // 一度検知したPlayerは、検知距離+この値を超えるまで見失わないようにします。
-    // 境界付近でA*接近とその他の行動が交互に切り替わる往復を防ぎます。
-    private const int DetectionLoseMargin = 2;
+    [Header("Debug")]
+    [SerializeField] private EnemyAIState _currentState = EnemyAIState.Idle;
+
+    // ---- 参照 ----
+    private GridManager _gridManager;
+    private CharacterBase _player;
+    private EnemyCharacter _enemy;
+    private MovementComponent _movement;
+    private BombComponent _bombComponent;
+    private BlockPlacementComponent _blockPlacement;
+    private MovementComponent _playerMovement;
+    private EnemyDifficultyValues _difficultyValues;
+
+    // ---- 危険予測と経路 ----
+    private readonly GridDangerMap _dangerMap = new GridDangerMap();
+    private readonly List<Vector3Int> _escapePath = new List<Vector3Int>();
+    private readonly List<GridPathStep> _attackPath = new List<GridPathStep>();
+    private Vector3Int _plannedPlayerPosition;
+    private bool _hasAttackPlan;
+    private bool _isWaitingForPlacedBlockJump;
+
+    // ---- 往復・行き詰まり対策 ----
+    private Vector3Int? _previousPosition;
+    private Vector3Int? _positionBeforePrevious;
+    private Vector3Int? _temporarilyAvoidedCell;
+    private float _avoidCellUntil;
+    private Vector3Int _lastDecisionPosition;
+    private int _sameCellDecisionCount;
+    private float _reconsiderUntil;
+    private bool _hasDecisionPosition;
+    private float _escapeSafeSince = NotMeasured;
+
+    // ---- 思考タイミング ----
+    private float _nextActionTime;
+    private bool _isInitialized;
+
+    // ---- Item取得 ----
+    private Item _itemTarget;
+    private int _itemTargetVersion;
+    private Vector3Int _itemTargetPosition;
+    private readonly List<GridPathStep> _itemPath = new();
+    private float _itemPlanUntil;
+    private float _nextItemSearch;
+
+    // ---- Player検知 ----
     private bool _isPlayerDetected;
 
     // 攻撃位置で確率判定に外れて待っている間は、意図した待機なので行き詰まりとして数えません。
@@ -89,8 +106,8 @@ public partial class EnemyBrain : MonoBehaviour
     private Vector3Int? _rejectedAttackCell;
     private float _rejectedAttackCellUntil;
 
-    [Header("Debug")]
-    [SerializeField] private EnemyAIState _currentState = EnemyAIState.Idle;
+    /// <summary>現在の状態です。実行中はInspectorからも確認できます。</summary>
+    public EnemyAIState CurrentState => _currentState;
 
     /// <summary>Spawnerから盤面、追跡対象、難易度を受け取って思考を開始します。</summary>
     public bool Init(
@@ -111,7 +128,7 @@ public partial class EnemyBrain : MonoBehaviour
         _blockPlacement = GetComponent<BlockPlacementComponent>();
         _playerMovement = player.GetComponent<MovementComponent>();
 
-        if (gridManager == null || player == null ||
+        if (gridManager == null ||
             _enemy == null || _movement == null || _bombComponent == null ||
             _blockPlacement == null || settings == null)
         {
@@ -136,7 +153,7 @@ public partial class EnemyBrain : MonoBehaviour
         SetState(EnemyAIState.Idle);
 
         Debug.Log(
-            $"Enemy AI initialized: Difficulty={difficulty}, Interval={_difficultyValues.ActionInterval}",
+            $"敵AIを初期化しました。難易度={difficulty}、行動間隔={_difficultyValues.ActionInterval}秒",
             this);
         return true;
     }
@@ -173,7 +190,7 @@ public partial class EnemyBrain : MonoBehaviour
         {
             ClearItemPlan(true);
             ClearAttackPath();
-            _escapeSafeSince = -1f;
+            _escapeSafeSince = NotMeasured;
             ResetStuckCounter(enemyPosition);
             SetState(EnemyAIState.Escape);
             TryEscapeDanger(enemyPosition);
@@ -190,10 +207,11 @@ public partial class EnemyBrain : MonoBehaviour
             return;
         }
 
-        _escapeSafeSince = -1f;
+        _escapeSafeSince = NotMeasured;
 
         // 行き詰まり後の待機中でも上の危険判定は実行し、爆風回避を止めません。
-        if (Time.time < _reconsiderUntil) return;
+        if (Time.time < _reconsiderUntil)
+            return;
 
         // 移動せず同じセルで判断し続けた場合、通常ロジックを繰り返さず別方向を試します。
         // ただし攻撃位置でのBomb設置待ちは意図した停止なので、行き詰まりに数えません。
@@ -227,9 +245,10 @@ public partial class EnemyBrain : MonoBehaviour
         }
 
         // 逃走と実行中の設置→ジャンプの完了後に、安全なItem取得を攻撃より優先します。
-        if (TryCollectItem(enemyPosition)) return;
+        if (TryCollectItem(enemyPosition))
+            return;
 
-        int distance = GetManhattanDistance(enemyPosition, playerPosition);
+        int distance = GridUtility.ManhattanDistance(enemyPosition, playerPosition);
         int detectionRange = _isPlayerDetected
             ? _difficultyValues.DetectionRange + DetectionLoseMargin
             : _difficultyValues.DetectionRange;
@@ -263,6 +282,7 @@ public partial class EnemyBrain : MonoBehaviour
                 _isWaitingToBomb = true;
                 _bombWaitPosition = enemyPosition;
             }
+
             return;
         }
 
@@ -271,11 +291,13 @@ public partial class EnemyBrain : MonoBehaviour
         if (detectedPlayer)
         {
             SetState(EnemyAIState.MoveToAttackPosition);
+
             if (TryFollowAttackPath(enemyPosition, playerPosition))
                 return;
 
             // 攻撃位置への経路がない場合だけ、その場のBlockを壊すBombを検討します。
             SetState(EnemyAIState.PlaceBomb);
+
             if (TryPlaceBombByChance(out _))
             {
                 ClearAttackPath();
@@ -285,6 +307,7 @@ public partial class EnemyBrain : MonoBehaviour
             {
                 SetState(EnemyAIState.Chase);
             }
+
             return;
         }
 
@@ -316,12 +339,14 @@ public partial class EnemyBrain : MonoBehaviour
         // 歩行・既存Blockへのジャンプで進めない場合だけ、足場を作って上ることを検討します。
         // 全方向を塞がれている場合は、Blockを壊すきっかけとしてBomb設置を試します。
         SetState(EnemyAIState.PlaceBomb);
+
         if (TryPlaceBombByChance(out _))
             SetState(EnemyAIState.Escape);
         else
             SetState(EnemyAIState.Idle);
     }
 
+    /// <summary>有効期限が切れていたら、ここで除外を解除します。</summary>
     private bool IsRejectedAttackCell(Vector3Int position)
     {
         if (!_rejectedAttackCell.HasValue)
@@ -336,10 +361,13 @@ public partial class EnemyBrain : MonoBehaviour
         return _rejectedAttackCell.Value == position;
     }
 
+    /// <summary>逃げ道がないと分かった攻撃位置を、一定時間A*のゴールから除外します。</summary>
     private void RejectAttackCell(Vector3Int position)
     {
         _rejectedAttackCell = position;
-        _rejectedAttackCellUntil = Time.time + Mathf.Max(2f, _difficultyValues.ActionInterval * 4f);
+        _rejectedAttackCellUntil = Time.time + Mathf.Max(
+            MinRejectedAttackCellSeconds,
+            _difficultyValues.ActionInterval * RejectedAttackCellActionIntervals);
     }
 
     /// <summary>有効期限内の除外攻撃位置を返します（A*のゴール除外用）。</summary>
@@ -347,6 +375,7 @@ public partial class EnemyBrain : MonoBehaviour
     {
         if (_rejectedAttackCell.HasValue && Time.time >= _rejectedAttackCellUntil)
             _rejectedAttackCell = null;
+
         return _rejectedAttackCell;
     }
 
@@ -401,34 +430,17 @@ public partial class EnemyBrain : MonoBehaviour
             return false;
         }
 
-        bool succeeded;
-        switch (step.Action)
+        // Block設置→ジャンプは2回の思考に分けるため、ここでは設置だけ行います。
+        if (step.Action == GridPathActionType.PlaceBlockAndJump)
         {
-            case GridPathActionType.Move:
-                succeeded = _movement.TryMove(step.Direction);
-                break;
+            bool placed = _movement.TryFace(step.Direction) && _blockPlacement.TryPlaceBlock();
+            if (placed)
+                _isWaitingForPlacedBlockJump = true;
 
-            case GridPathActionType.JumpUp:
-                succeeded = _movement.TryJump(step.Direction);
-                break;
-
-            case GridPathActionType.MoveAndFall:
-                succeeded = _movement.TryMoveAndFall(step.Direction);
-                break;
-
-            case GridPathActionType.PlaceBlockAndJump:
-                succeeded = _movement.TryFace(step.Direction) &&
-                            _blockPlacement.TryPlaceBlock();
-                if (succeeded)
-                    _isWaitingForPlacedBlockJump = true;
-                return succeeded;
-
-            default:
-                succeeded = false;
-                break;
+            return placed;
         }
 
-        if (!succeeded)
+        if (!TryExecuteMoveStep(step))
         {
             ClearAttackPath();
             return false;
@@ -439,6 +451,26 @@ public partial class EnemyBrain : MonoBehaviour
         return true;
     }
 
+    /// <summary>経路の1手（移動系の行動）を実行します。PlaceBlockAndJumpは対象外でfalseを返します。</summary>
+    private bool TryExecuteMoveStep(GridPathStep step)
+    {
+        switch (step.Action)
+        {
+            case GridPathActionType.Move:
+                return _movement.TryMove(step.Direction);
+
+            case GridPathActionType.JumpUp:
+                return _movement.TryJump(step.Direction);
+
+            case GridPathActionType.MoveAndFall:
+                return _movement.TryMoveAndFall(step.Direction);
+
+            default:
+                return false;
+        }
+    }
+
+    /// <summary>保持中の攻撃経路と、Block設置→ジャンプの途中状態を破棄します。</summary>
     private void ClearAttackPath()
     {
         _attackPath.Clear();
@@ -454,9 +486,12 @@ public partial class EnemyBrain : MonoBehaviour
             ClearItemPlan(false);
             return false;
         }
+
+        // 目標が再出現・移動・取得不可・計画期限切れになったら計画を破棄します。
         if (_itemTarget != null &&
             (_itemTarget.SpawnVersion != _itemTargetVersion ||
-             _itemTarget.GridPosition != _itemTargetPosition || !CanTargetItem(_itemTarget) ||
+             _itemTarget.GridPosition != _itemTargetPosition ||
+             !CanTargetItem(_itemTarget) ||
              Time.time >= _itemPlanUntil))
         {
             ClearItemPlan(true);
@@ -466,79 +501,129 @@ public partial class EnemyBrain : MonoBehaviour
         if (_itemTarget == null)
         {
             _itemPath.Clear();
-            if (Time.time < _nextItemSearch) return false;
+
+            if (Time.time < _nextItemSearch)
+                return false;
+
             _nextItemSearch = Time.time + _difficultyValues.ItemSearchInterval;
-            float bestTime = float.PositiveInfinity;
-            Vector3Int size = _gridManager.Size;
-            for (int x = 0; x < size.x; x++)
-            for (int y = 0; y < size.y; y++)
-            for (int z = 0; z < size.z; z++)
-            {
-                Vector3Int position = new Vector3Int(x, y, z);
-                if (GetManhattanDistance(current, position) > _difficultyValues.DetectionRange) continue;
-                Item item = _gridManager.GetItem(position);
-                if (!CanTargetItem(item)) continue;
-                List<GridPathStep> path = GridPathfindingSystem.FindSafePathToItem(
-                    _gridManager, _dangerMap, current, position, _movement.MoveDuration,
-                    _movement.JumpDuration, _movement.FallDurationPerCell,
-                    _difficultyValues.ActionInterval, out float travelTime,
-                    DebugBeginSearchTrace(PathSearchAlgorithm.Dijkstra, "Item"));
-                if (travelTime >= bestTime || travelTime > _difficultyValues.ItemPlanTimeout ||
-                    (path.Count == 0 && position != current)) continue;
-                bestTime = travelTime;
-                _itemTarget = item;
-                _itemTargetVersion = item.SpawnVersion;
-                _itemTargetPosition = position;
-                _itemPath.Clear();
-                _itemPath.AddRange(path);
-            }
-            if (_itemTarget == null) return false;
+
+            if (!SearchBestItem(current))
+                return false;
+
             _itemPlanUntil = Time.time + _difficultyValues.ItemPlanTimeout;
             ClearAttackPath();
         }
 
+        // 目標セルに着いたら取得します。
         if (current == _itemTargetPosition)
         {
             bool collected = _itemTarget.TryCollect(_enemy);
             ClearItemPlan(!collected);
-            if (collected) SetState(EnemyAIState.CollectItem);
+
+            if (collected)
+                SetState(EnemyAIState.CollectItem);
+
             return collected;
         }
-        while (_itemPath.Count > 0 && _itemPath[0].Position == current) _itemPath.RemoveAt(0);
+
+        while (_itemPath.Count > 0 && _itemPath[0].Position == current)
+            _itemPath.RemoveAt(0);
 
         // 毎思考で残り経路を再検証。移動先だけでなく途中の降下列や足場の変化も確認します。
         Vector3Int cursor = current;
         float arrival = 0f;
+
         foreach (GridPathStep step in _itemPath)
         {
-            if (!GridPathfindingSystem.IsSafeItemStep(_gridManager, _dangerMap, cursor, step,
-                    _movement.MoveDuration, _movement.JumpDuration, _movement.FallDurationPerCell,
-                    _difficultyValues.ActionInterval, arrival, out float duration))
+            if (!GridPathfindingSystem.IsSafeItemStep(
+                    _gridManager,
+                    _dangerMap,
+                    cursor,
+                    step,
+                    _movement.MoveDuration,
+                    _movement.JumpDuration,
+                    _movement.FallDurationPerCell,
+                    _difficultyValues.ActionInterval,
+                    arrival,
+                    out float duration))
             {
                 ClearItemPlan(true);
                 return false;
             }
+
             cursor = step.Position;
             arrival += duration;
         }
+
         if (_itemPath.Count == 0)
         {
             ClearItemPlan(true);
             return false;
         }
 
-        GridPathStep next = _itemPath[0];
-        bool moved = next.Action == GridPathActionType.Move ? _movement.TryMove(next.Direction) :
-            next.Action == GridPathActionType.JumpUp ? _movement.TryJump(next.Direction) :
-            next.Action == GridPathActionType.MoveAndFall && _movement.TryMoveAndFall(next.Direction);
-        if (!moved)
+        if (!TryExecuteMoveStep(_itemPath[0]))
         {
             ClearItemPlan(true);
             return false;
         }
+
         SetState(EnemyAIState.CollectItem);
         RememberMove(current);
         return true;
+    }
+
+    /// <summary>
+    /// 検知距離内のItemから、最も早く安全に到着できるものを目標に設定します。
+    /// 見つかればtrueを返します。
+    /// </summary>
+    private bool SearchBestItem(Vector3Int current)
+    {
+        float bestTime = float.PositiveInfinity;
+        Vector3Int size = _gridManager.Size;
+
+        for (int x = 0; x < size.x; x++)
+        {
+            for (int y = 0; y < size.y; y++)
+            {
+                for (int z = 0; z < size.z; z++)
+                {
+                    Vector3Int position = new Vector3Int(x, y, z);
+                    if (GridUtility.ManhattanDistance(current, position) > _difficultyValues.DetectionRange)
+                        continue;
+
+                    Item item = _gridManager.GetItem(position);
+                    if (!CanTargetItem(item))
+                        continue;
+
+                    List<GridPathStep> path = GridPathfindingSystem.FindSafePathToItem(
+                        _gridManager,
+                        _dangerMap,
+                        current,
+                        position,
+                        _movement.MoveDuration,
+                        _movement.JumpDuration,
+                        _movement.FallDurationPerCell,
+                        _difficultyValues.ActionInterval,
+                        out float travelTime,
+                        DebugBeginSearchTrace(PathSearchAlgorithm.Dijkstra, "Item"));
+
+                    // より遅い・計画期限を超える・経路がない（現在地以外）候補は採用しません。
+                    if (travelTime >= bestTime ||
+                        travelTime > _difficultyValues.ItemPlanTimeout ||
+                        (path.Count == 0 && position != current))
+                        continue;
+
+                    bestTime = travelTime;
+                    _itemTarget = item;
+                    _itemTargetVersion = item.SpawnVersion;
+                    _itemTargetPosition = position;
+                    _itemPath.Clear();
+                    _itemPath.AddRange(path);
+                }
+            }
+        }
+
+        return _itemTarget != null;
     }
 
     /// <summary>着地済み・取得による強化あり・危険予測なしのItemだけを対象にします。</summary>
@@ -547,18 +632,29 @@ public partial class EnemyBrain : MonoBehaviour
         if (item == null || !item.IsAvailable || item.IsFalling || item.Settings == null ||
             _gridManager.GetItem(item.GridPosition) != item ||
             !_gridManager.HasBlock(item.GridPosition + Vector3Int.down) ||
-            _dangerMap.IsDangerous(item.GridPosition)) return false;
+            _dangerMap.IsDangerous(item.GridPosition))
+            return false;
+
         InventoryComponent inventory = _enemy.GetComponent<InventoryComponent>();
-        int bonus = inventory == null ? 0 : item.Settings.Type == ItemType.BombPower ?
-            inventory.BombPowerBonus : inventory.BombCountBonus;
+
+        int bonus;
+        if (inventory == null)
+            bonus = 0;
+        else if (item.Settings.Type == ItemType.BombPower)
+            bonus = inventory.BombPowerBonus;
+        else
+            bonus = inventory.BombCountBonus;
+
         // 上限品は消費する目的で追わず、強化できるItemを優先します。
         return bonus < item.Settings.MaxBonus;
     }
 
+    /// <summary>Item取得の計画を破棄します。retryDelayなら一定時間は再探索しません。</summary>
     private void ClearItemPlan(bool retryDelay)
     {
         _itemTarget = null;
         _itemPath.Clear();
+
         if (retryDelay)
             _nextItemSearch = Time.time + _difficultyValues.ItemRetryDelay;
     }
@@ -571,7 +667,7 @@ public partial class EnemyBrain : MonoBehaviour
 
         EnemyAIState previousState = _currentState;
         _currentState = nextState;
-        Debug.Log($"Enemy AI State: {previousState} -> {_currentState}", this);
+        Debug.Log($"敵AIの状態が変わりました。{previousState} → {_currentState}", this);
     }
 
     /// <summary>
@@ -595,10 +691,12 @@ public partial class EnemyBrain : MonoBehaviour
                 _movement.FallDurationPerCell,
                 DebugBeginSearchTrace(PathSearchAlgorithm.Bfs, "Escape"));
 
+            // 経路は開始セルを含むため、2セル未満なら移動先がありません。
             if (newPath.Count < 2)
                 return TryCreateEscapeStep(enemyPosition);
 
             _escapePath.Clear();
+
             // startは現在地なので、実際にこれから通るセルだけを保持します。
             for (int i = 1; i < newPath.Count; i++)
                 _escapePath.Add(newPath[i]);
@@ -611,6 +709,7 @@ public partial class EnemyBrain : MonoBehaviour
         Vector3Int horizontalDirection =
             new Vector3Int(difference.x, 0, difference.z);
 
+        // 次セルが1段高い場合は段差ジャンプします。
         if (difference.y == 1)
         {
             if (_movement.TryJump(horizontalDirection))
@@ -654,7 +753,7 @@ public partial class EnemyBrain : MonoBehaviour
     /// </summary>
     private List<Vector3Int> CreateDirectionCandidates(Vector3Int enemyPosition, Vector3Int playerPosition)
     {
-        List<Vector3Int> candidates = new List<Vector3Int>(HorizontalDirections);
+        List<Vector3Int> candidates = new List<Vector3Int>(GridUtility.HorizontalDirections);
         bool makesMistake = Random.value < _difficultyValues.MistakeChance;
 
         if (makesMistake)
@@ -680,8 +779,8 @@ public partial class EnemyBrain : MonoBehaviour
             if (leftCanAttack != rightCanAttack)
                 return leftCanAttack ? -1 : 1;
 
-            int leftDistance = GetManhattanDistance(enemyPosition + left, playerPosition);
-            int rightDistance = GetManhattanDistance(enemyPosition + right, playerPosition);
+            int leftDistance = GridUtility.ManhattanDistance(enemyPosition + left, playerPosition);
+            int rightDistance = GridUtility.ManhattanDistance(enemyPosition + right, playerPosition);
             return leftDistance.CompareTo(rightDistance);
         });
 
@@ -752,14 +851,14 @@ public partial class EnemyBrain : MonoBehaviour
 
         float requiredTime = _difficultyValues.ActionInterval +
                              Mathf.Max(_movement.JumpDuration, _difficultyValues.ActionInterval) +
-                             0.05f;
+                             JumpDangerMarginSeconds;
 
         if (requiredTime >= dangerTime)
             return false;
 
-        for (int i = 0; i < HorizontalDirections.Length; i++)
+        for (int i = 0; i < GridUtility.HorizontalDirections.Length; i++)
         {
-            Vector3Int direction = HorizontalDirections[i];
+            Vector3Int direction = GridUtility.HorizontalDirections[i];
             Vector3Int blockPosition = currentPosition + direction;
             Vector3Int landingPosition = blockPosition + Vector3Int.up;
             Vector3Int supportPosition = blockPosition + Vector3Int.down;
@@ -777,6 +876,7 @@ public partial class EnemyBrain : MonoBehaviour
         return false;
     }
 
+    /// <summary>往復検知用に、直前と2つ前の出発セルを記録します。</summary>
     private void RememberMove(Vector3Int position)
     {
         _positionBeforePrevious = _previousPosition;
@@ -811,10 +911,11 @@ public partial class EnemyBrain : MonoBehaviour
     {
         if (_bombComponent.CurrentBombCount > 0 || HasDangerousNeighbor(currentPosition))
         {
-            _escapeSafeSince = -1f;
+            _escapeSafeSince = NotMeasured;
             return false;
         }
 
+        // 未計測なら、今から安全確認を始めます。
         if (_escapeSafeSince < 0f)
         {
             _escapeSafeSince = Time.time;
@@ -828,9 +929,9 @@ public partial class EnemyBrain : MonoBehaviour
     /// <summary>通常移動先と1段ジャンプ先の周囲に危険が残っているか調べます。</summary>
     private bool HasDangerousNeighbor(Vector3Int currentPosition)
     {
-        for (int i = 0; i < HorizontalDirections.Length; i++)
+        for (int i = 0; i < GridUtility.HorizontalDirections.Length; i++)
         {
-            Vector3Int direction = HorizontalDirections[i];
+            Vector3Int direction = GridUtility.HorizontalDirections[i];
             Vector3Int neighbor = currentPosition + direction;
 
             if (_dangerMap.IsDangerous(neighbor))
@@ -854,7 +955,7 @@ public partial class EnemyBrain : MonoBehaviour
         SetState(EnemyAIState.Idle);
         _escapePath.Clear();
 
-        List<Vector3Int> alternatives = new List<Vector3Int>(HorizontalDirections);
+        List<Vector3Int> alternatives = new List<Vector3Int>(GridUtility.HorizontalDirections);
         Shuffle(alternatives);
         MovePreviousCellToEnd(alternatives, currentPosition);
 
@@ -870,7 +971,7 @@ public partial class EnemyBrain : MonoBehaviour
             if (TryTraverseAndRemember(currentPosition, alternatives[i]))
             {
                 ResetStuckCounter(_movement.CurrentGridPosition);
-                Debug.Log($"Enemy AI recovered from repeated action: moved toward {alternatives[i]}", this);
+                Debug.Log($"敵AIが行き詰まりを解消しました。移動方向={alternatives[i]}", this);
                 return;
             }
         }
@@ -879,7 +980,7 @@ public partial class EnemyBrain : MonoBehaviour
         _sameCellDecisionCount = 0;
         _previousPosition = null;
         _positionBeforePrevious = null;
-        Debug.Log($"Enemy AI paused repeated action for {_difficultyValues.ReconsiderPause:0.00}s", this);
+        Debug.Log($"敵AIが行き詰まったため、{_difficultyValues.ReconsiderPause:0.00}秒待機します。", this);
     }
 
     /// <summary>次の移動がA→B→A→Bという2セル往復を完成させるか判定します。</summary>
@@ -897,13 +998,16 @@ public partial class EnemyBrain : MonoBehaviour
     private void TemporarilyAvoid(Vector3Int position)
     {
         _temporarilyAvoidedCell = position;
-        _avoidCellUntil = Time.time + Mathf.Max(0.5f, _difficultyValues.ActionInterval * 3f);
+        _avoidCellUntil = Time.time + Mathf.Max(
+            MinOscillationAvoidanceSeconds,
+            _difficultyValues.ActionInterval * OscillationAvoidanceActionIntervals);
 
         Debug.Log(
-            $"Enemy AI detected oscillation. Temporarily avoiding Cell={position}",
+            $"敵AIが往復を検知しました。セル {position} を一時的に回避します。",
             this);
     }
 
+    /// <summary>有効期限が切れていたら、ここで回避セルを解除します。</summary>
     private bool IsTemporarilyAvoided(Vector3Int position)
     {
         if (!_temporarilyAvoidedCell.HasValue)
@@ -926,19 +1030,7 @@ public partial class EnemyBrain : MonoBehaviour
         if (!_gridManager.Contains(bombPosition) || _bombComponent.ExplosionPower <= 0)
             return false;
 
-        IReadOnlyList<Vector3Int> affectedCells =
-            ExplosionSystem.CalculateAffectedCells(
-                _gridManager,
-                bombPosition,
-                _bombComponent.ExplosionPower);
-
-        for (int i = 0; i < affectedCells.Count; i++)
-        {
-            if (affectedCells[i] == playerPosition)
-                return true;
-        }
-
-        return false;
+        return ExplosionSystem.CanReach(_gridManager, bombPosition, playerPosition, _bombComponent.ExplosionPower);
     }
 
     /// <summary>
@@ -982,6 +1074,7 @@ public partial class EnemyBrain : MonoBehaviour
             _movement.FallDurationPerCell,
             escapeTrace);
 
+        // 経路は開始セルを含むため、2セル未満なら逃げ先がありません。
         if (escapePath.Count < 2)
         {
             result = BombAttemptResult.NoEscapeRoute;
@@ -993,15 +1086,6 @@ public partial class EnemyBrain : MonoBehaviour
         result = placed ? BombAttemptResult.Placed : BombAttemptResult.PlaceFailed;
         DebugRecordBombDecision(result, escapeTrace);
         return placed;
-    }
-
-    /// <summary>XYZ各軸の差を合計したグリッド上の距離を返します。</summary>
-    private static int GetManhattanDistance(Vector3Int from, Vector3Int to)
-    {
-        Vector3Int difference = from - to;
-        return Mathf.Abs(difference.x) +
-               Mathf.Abs(difference.y) +
-               Mathf.Abs(difference.z);
     }
 
     /// <summary>Fisher-Yates法で候補方向をランダムに並べ替えます。</summary>

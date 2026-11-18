@@ -30,6 +30,40 @@ internal static class PathSearchTraceDrawer
     private static readonly Color StartColor = new Color(0.3f, 1f, 0.45f);
     private static readonly Color TargetColor = new Color(1f, 0.35f, 0.35f);
 
+    // 展開ノードの色: 展開順に色相を青(0.62)→橙(0.07)へ変化させます。
+    private const float FirstNodeHue = 0.62f;
+    private const float LastNodeHue = 0.07f;
+    private const float NodeSaturation = 0.75f;
+    private const float NodeValue = 1f;
+
+    // 展開ノードの描画（サイズはセル幅に対する割合、αは不透明度の倍率）
+    private const float NodeSizeInCells = 0.42f;
+    private const float ParentLinkAlpha = 0.45f;
+    private const float NodeFillAlpha = 0.3f;
+    private const float NodeLabelHeightInNodes = 0.75f;
+
+    // 現在のステップを示す二重枠とラベル（セル幅に対する割合）
+    private const float CurrentOuterFrameInCells = 0.95f;
+    private const float CurrentInnerFrameInCells = 0.9f;
+    private const float CurrentLabelHeightInCells = 0.9f;
+
+    /// <summary>探索の概要ラベルを開始セルからどれだけ上に出すか（セル単位）。</summary>
+    private const float SummaryLabelHeightInCells = 2.1f;
+
+    // 開始・目標マーカー（床から少し浮かせ、セル幅に対する割合の半径で描きます）
+    private const float MarkerFloorOffset = 0.03f;
+    private const float MarkerOuterRadiusInCells = 0.48f;
+    private const float MarkerInnerRadiusInCells = 0.36f;
+
+    /// <summary>最終経路をノードと重ならないよう持ち上げる高さ（セル単位）。</summary>
+    private const float FinalPathHeightInCells = 0.25f;
+
+    /// <summary>Y階層フィルタで「他の階層を薄く表示」するときの不透明度。</summary>
+    private const float DimmedLayerAlpha = 0.12f;
+
+    private const int NodeLabelFontSize = 9;
+    private const int DetailLabelFontSize = 11;
+
     private static GUIStyle _nodeStyle;
     private static GUIStyle _detailStyle;
 
@@ -37,6 +71,7 @@ internal static class PathSearchTraceDrawer
     {
         if (Event.current.type != EventType.Repaint)
             return;
+
         if (brain == null || trace == null || !brain.DebugIsReady)
             return;
 
@@ -47,7 +82,7 @@ internal static class PathSearchTraceDrawer
         float cell = space.CellSize;
         IReadOnlyList<PathSearchNodeRecord> nodes = trace.ExpandedNodes;
         int count = Mathf.Clamp(visibleCount, 0, nodes.Count);
-        float nodeSize = cell * 0.42f;
+        float nodeSize = cell * NodeSizeInCells;
 
         // 展開済みノード（現在のステップまで）
         for (int i = 0; i < count; i++)
@@ -59,29 +94,34 @@ internal static class PathSearchTraceDrawer
 
             // 色は全体に対する展開順で決め、再生中も同じノードの色が変わらないようにします。
             float t = nodes.Count <= 1 ? 1f : i / (float)(nodes.Count - 1);
-            Color color = Color.HSVToRGB(Mathf.Lerp(0.62f, 0.07f, t), 0.75f, 1f);
+            Color color = Color.HSVToRGB(Mathf.Lerp(FirstNodeHue, LastNodeHue, t), NodeSaturation, NodeValue);
             Vector3 center = space.Center(node.Position);
 
             if (options.ShowParentLinks && node.HasParent)
             {
-                Handles.color = WithAlpha(color, 0.45f * alpha);
+                Handles.color = WithAlpha(color, ParentLinkAlpha * alpha);
                 Handles.DrawLine(space.Center(node.ParentPosition), center);
             }
 
-            Handles.color = WithAlpha(color, 0.3f * alpha);
+            Handles.color = WithAlpha(color, NodeFillAlpha * alpha);
             Handles.CubeHandleCap(0, center, Quaternion.identity, nodeSize, EventType.Repaint);
+
             Handles.color = WithAlpha(color, alpha);
             Handles.DrawWireCube(center, Vector3.one * nodeSize);
 
             if (options.ShowOrderLabels || options.ShowCostLabels)
             {
                 string text = options.ShowOrderLabels ? $"#{node.Order} y{node.Position.y}" : "";
+
                 if (options.ShowCostLabels)
                     text += (text.Length > 0 ? "\n" : "") + FormatCost(trace.Algorithm, node, false);
+
+                // VB = 経路中に仮想設置したBlock（Virtual Block）があるノード
                 if (node.HasVirtualBlock)
                     text += "\n+VB";
+
                 _nodeStyle.normal.textColor = WithAlpha(color, alpha);
-                Handles.Label(center + Vector3.up * (nodeSize * 0.75f), text, _nodeStyle);
+                Handles.Label(center + Vector3.up * (nodeSize * NodeLabelHeightInNodes), text, _nodeStyle);
             }
         }
 
@@ -97,21 +137,28 @@ internal static class PathSearchTraceDrawer
         {
             PathSearchNodeRecord current = nodes[count - 1];
             Vector3 center = space.Center(current.Position);
+
             Handles.color = Color.white;
-            Handles.DrawWireCube(center, Vector3.one * (cell * 0.95f));
-            Handles.DrawWireCube(center, Vector3.one * (cell * 0.9f));
-            Handles.Label(center + Vector3.up * (cell * 0.9f),
-                $"STEP #{current.Order}  ({current.Position.x},{current.Position.y},{current.Position.z})\n" +
+            Handles.DrawWireCube(center, Vector3.one * (cell * CurrentOuterFrameInCells));
+            Handles.DrawWireCube(center, Vector3.one * (cell * CurrentInnerFrameInCells));
+
+            Handles.Label(
+                center + Vector3.up * (cell * CurrentLabelHeightInCells),
+                $"ステップ #{current.Order}  ({current.Position.x},{current.Position.y},{current.Position.z})\n" +
                 FormatCost(trace.Algorithm, current, true),
                 _detailStyle);
         }
 
         // 探索の概要（開始セルの上）
-        string result = !trace.IsCompleted ? "running" :
-            trace.Succeeded ? $"path {trace.FinalPathStepCount} steps" : "no path";
-        Handles.Label(space.Center(trace.Start) + Vector3.up * (cell * 2.1f),
+        string result = !trace.IsCompleted ? "探索中"
+            : trace.Succeeded ? $"経路 {trace.FinalPathStepCount}手"
+            : "経路なし";
+        string truncated = trace.IsTruncated ? "（記録上限で省略）" : "";
+
+        Handles.Label(
+            space.Center(trace.Start) + Vector3.up * (cell * SummaryLabelHeightInCells),
             $"[{GetAlgorithmName(trace.Algorithm)}] {trace.Label}\n" +
-            $"expanded {count}/{trace.ExpandedCount}{(trace.IsTruncated ? " (truncated)" : "")}  {result}",
+            $"展開 {count}/{trace.ExpandedCount}{truncated}  {result}",
             _detailStyle);
     }
 
@@ -119,10 +166,17 @@ internal static class PathSearchTraceDrawer
     {
         switch (algorithm)
         {
-            case PathSearchAlgorithm.Bfs: return "BFS";
-            case PathSearchAlgorithm.AStar: return "A*";
-            case PathSearchAlgorithm.Dijkstra: return "Dijkstra";
-            default: return algorithm.ToString();
+            case PathSearchAlgorithm.Bfs:
+                return "BFS";
+
+            case PathSearchAlgorithm.AStar:
+                return "A*";
+
+            case PathSearchAlgorithm.Dijkstra:
+                return "Dijkstra";
+
+            default:
+                return algorithm.ToString();
         }
     }
 
@@ -135,34 +189,42 @@ internal static class PathSearchTraceDrawer
                 return verbose
                     ? $"g={node.GCost:0.00}  h={node.HCost:0.00}  f={node.FCost:0.00}"
                     : $"g{node.GCost:0.0} h{node.HCost:0.0} f{node.FCost:0.0}";
+
             case PathSearchAlgorithm.Dijkstra:
-                return verbose ? $"cumulative time = {node.GCost:0.00}s" : $"{node.GCost:0.00}s";
+                return verbose
+                    ? $"累積時間 = {node.GCost:0.00}秒"
+                    : $"{node.GCost:0.00}s";
+
             default:
-                return verbose ? $"order {node.Order}, arrival = {node.GCost:0.00}s" : $"t{node.GCost:0.00}s";
+                return verbose
+                    ? $"展開順 {node.Order}、到着 = {node.GCost:0.00}秒"
+                    : $"t{node.GCost:0.00}s";
         }
     }
 
     private static void DrawEndpoints(EnemyAIDebugGizmoDrawer.GridSpace space, PathSearchTrace trace)
     {
         float cell = space.CellSize;
+        Vector3 markerOffset = Vector3.up * MarkerFloorOffset;
+
         Handles.color = StartColor;
-        Handles.DrawWireDisc(space.Bottom(trace.Start) + Vector3.up * 0.03f, Vector3.up, cell * 0.48f);
+        Handles.DrawWireDisc(space.Bottom(trace.Start) + markerOffset, Vector3.up, cell * MarkerOuterRadiusInCells);
         _nodeStyle.normal.textColor = StartColor;
-        Handles.Label(space.Bottom(trace.Start), "START", _nodeStyle);
+        Handles.Label(space.Bottom(trace.Start), "開始", _nodeStyle);
 
         if (!trace.HasTarget)
             return;
 
         Handles.color = TargetColor;
-        Handles.DrawWireDisc(space.Bottom(trace.Target) + Vector3.up * 0.03f, Vector3.up, cell * 0.48f);
-        Handles.DrawWireDisc(space.Bottom(trace.Target) + Vector3.up * 0.03f, Vector3.up, cell * 0.36f);
+        Handles.DrawWireDisc(space.Bottom(trace.Target) + markerOffset, Vector3.up, cell * MarkerOuterRadiusInCells);
+        Handles.DrawWireDisc(space.Bottom(trace.Target) + markerOffset, Vector3.up, cell * MarkerInnerRadiusInCells);
         _nodeStyle.normal.textColor = TargetColor;
-        Handles.Label(space.Bottom(trace.Target), $"TARGET y{trace.Target.y}", _nodeStyle);
+        Handles.Label(space.Bottom(trace.Target), $"目標 y{trace.Target.y}", _nodeStyle);
     }
 
     private static void DrawFinalPath(EnemyAIDebugGizmoDrawer.GridSpace space, PathSearchTrace trace)
     {
-        Vector3 offset = Vector3.up * (space.CellSize * 0.25f);
+        Vector3 offset = Vector3.up * (space.CellSize * FinalPathHeightInCells);
         IReadOnlyList<GridPathStep> steps = trace.FinalSteps;
         IReadOnlyList<Vector3Int> cells = trace.FinalPath;
 
@@ -171,8 +233,14 @@ internal static class PathSearchTraceDrawer
             Vector3Int from = trace.Start;
             for (int i = 0; i < steps.Count; i++)
             {
-                EnemyAIDebugGizmoDrawer.DrawStep(space, from, steps[i].Position, steps[i].Direction,
-                    steps[i].Action, FinalPathColor, offset);
+                EnemyAIDebugGizmoDrawer.DrawStep(
+                    space,
+                    from,
+                    steps[i].Position,
+                    steps[i].Direction,
+                    steps[i].Action,
+                    FinalPathColor,
+                    offset);
                 from = steps[i].Position;
             }
         }
@@ -182,23 +250,36 @@ internal static class PathSearchTraceDrawer
             for (int i = 1; i < cells.Count; i++)
             {
                 Vector3Int difference = cells[i] - cells[i - 1];
-                GridPathActionType action = difference.y > 0 ? GridPathActionType.JumpUp :
-                    difference.y < 0 ? GridPathActionType.MoveAndFall : GridPathActionType.Move;
-                EnemyAIDebugGizmoDrawer.DrawStep(space, cells[i - 1], cells[i],
-                    new Vector3Int(difference.x, 0, difference.z), action, FinalPathColor, offset);
+                GridPathActionType action = EnemyAIDebugGizmoDrawer.InferAction(difference);
+
+                EnemyAIDebugGizmoDrawer.DrawStep(
+                    space,
+                    cells[i - 1],
+                    cells[i],
+                    new Vector3Int(difference.x, 0, difference.z),
+                    action,
+                    FinalPathColor,
+                    offset);
             }
         }
 
         if (cells.Count > 0)
-            EnemyAIDebugGizmoDrawer.DrawGoalMarker(space, cells[cells.Count - 1], FinalPathColor, offset,
-                $"GOAL ({trace.FinalPathStepCount} steps, {trace.FinalCost:0.00}s)");
+        {
+            EnemyAIDebugGizmoDrawer.DrawGoalMarker(
+                space,
+                cells[cells.Count - 1],
+                FinalPathColor,
+                offset,
+                $"ゴール（{trace.FinalPathStepCount}手、{trace.FinalCost:0.00}秒）");
+        }
     }
 
     private static float GetLayerAlpha(int y, Options options)
     {
         if (!options.FilterByLayer || y == options.Layer)
             return 1f;
-        return options.DimOtherLayers ? 0.12f : 0f;
+
+        return options.DimOtherLayers ? DimmedLayerAlpha : 0f;
     }
 
     private static Color WithAlpha(Color color, float alpha) => new Color(color.r, color.g, color.b, alpha);
@@ -210,7 +291,7 @@ internal static class PathSearchTraceDrawer
             _nodeStyle = new GUIStyle(EditorStyles.miniBoldLabel)
             {
                 alignment = TextAnchor.MiddleCenter,
-                fontSize = 9
+                fontSize = NodeLabelFontSize
             };
         }
 
@@ -218,7 +299,7 @@ internal static class PathSearchTraceDrawer
         {
             _detailStyle = new GUIStyle(EditorStyles.helpBox)
             {
-                fontSize = 11,
+                fontSize = DetailLabelFontSize,
                 alignment = TextAnchor.UpperLeft
             };
             _detailStyle.normal.textColor = Color.white;

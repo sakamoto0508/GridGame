@@ -60,9 +60,7 @@ public sealed class EnemyAIDebugVisualizer : MonoBehaviour
     public bool DangerNearEnemyHeightOnly => _dangerNearEnemyHeightOnly;
     public bool SelectedEnemyOnly => _selectedEnemyOnly;
 
-    public bool RecordSearchHistory => _recordSearchHistory;
     public int MaxHistoryPerEnemy => _maxHistoryPerEnemy;
-    public int MaxNodesPerSearch => _maxNodesPerSearch;
 
 #if UNITY_EDITOR
     // 探索履歴の収集設定はEditor上でのみ共有設定へ反映します。ビルドでは収集は常に無効です。

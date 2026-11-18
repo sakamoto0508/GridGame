@@ -10,8 +10,13 @@ public class ItemSettings : ScriptableObject
     [SerializeField, Min(1)] private int _increaseAmount = 1;
     [SerializeField, Min(1)] private int _maxBonus = 8;
     [SerializeField, Min(0.01f)] private float _fallDurationPerCell = 0.12f;
+
+    // Inspectorの下限値と同じ値です。古いAssetの不正値もここで補正します。
+    private const int MinAmount = 1;
+    private const float MinFallDurationPerCell = 0.01f;
+
     public ItemType Type => _type;
-    public int IncreaseAmount => Mathf.Max(1, _increaseAmount);
-    public int MaxBonus => Mathf.Max(1, _maxBonus);
-    public float FallDurationPerCell => Mathf.Max(0.01f, _fallDurationPerCell);
+    public int IncreaseAmount => Mathf.Max(MinAmount, _increaseAmount);
+    public int MaxBonus => Mathf.Max(MinAmount, _maxBonus);
+    public float FallDurationPerCell => Mathf.Max(MinFallDurationPerCell, _fallDurationPerCell);
 }

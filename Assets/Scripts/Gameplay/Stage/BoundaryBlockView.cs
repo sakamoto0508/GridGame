@@ -7,16 +7,25 @@ public class BoundaryBlockView : MonoBehaviour
     private bool[] _originalForceOff;
     private GridManager _grid;
     private Block _block;
+
     public Vector3Int Position { get; private set; }
-    public bool IsRegistered => _grid != null && _block != null &&
-        gameObject.activeInHierarchy && _grid.GetBlock(Position) == _block;
+
+    /// <summary>このBlockが現在もグリッド上の自分の座標に登録されているならtrueです。</summary>
+    public bool IsRegistered =>
+        _grid != null &&
+        _block != null &&
+        gameObject.activeInHierarchy &&
+        _grid.GetBlock(Position) == _block;
 
     public void Init(GridManager grid, Block block, Vector3Int position)
     {
         Restore();
+
         _grid = grid;
         _block = block;
         Position = position;
+
+        // 元から非表示のRendererを覚えておき、Restoreで誤って表示しないようにします。
         _renderers = GetComponentsInChildren<Renderer>(true);
         _originalForceOff = new bool[_renderers.Length];
         for (int i = 0; i < _renderers.Length; i++)
@@ -25,10 +34,14 @@ public class BoundaryBlockView : MonoBehaviour
 
     public void SetHidden(bool hidden)
     {
-        if (_renderers == null) return;
+        if (_renderers == null)
+            return;
+
         for (int i = 0; i < _renderers.Length; i++)
+        {
             if (_renderers[i] != null)
                 _renderers[i].forceRenderingOff = hidden || _originalForceOff[i];
+        }
     }
 
     public void Restore() => SetHidden(false);

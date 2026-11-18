@@ -1,5 +1,59 @@
+# ---- プロジェクト固有 ----
 Assets/Import/
-Library/Artifacts/
-Library/Bee/
-Library/
-Logs/
+
+# ---- Unityが自動生成するフォルダ ----
+/[Ll]ibrary/
+/[Tt]emp/
+/[Oo]bj/
+/[Bb]uild/
+/[Bb]uilds/
+/[Ll]ogs/
+/[Uu]ser[Ss]ettings/
+/[Mm]emoryCaptures/
+/[Rr]ecordings/
+
+# アセットストアのツールが作る不要ファイル
+/[Aa]ssets/AssetStoreTools*
+
+# Addressablesのビルド出力
+/[Aa]ssets/[Ss]treamingAssets/aa.meta
+/[Aa]ssets/[Ss]treamingAssets/aa/*
+
+# ---- IDE・エディタ（Visual Studio / Rider / VS Code） ----
+# .vsconfig はUnityが必要なワークロードを記録するファイルなので管理対象のままにします。
+.vs/
+.idea/
+.gradle/
+ExportedObj/
+.consulo/
+
+# Unityが自動で作り直すプロジェクトファイル
+*.csproj
+*.unityproj
+*.sln
+*.slnx
+*.suo
+*.tmp
+*.user
+*.userprefs
+*.pidb
+*.booproj
+*.svd
+*.pdb
+*.mdb
+*.opendb
+*.VC.db
+
+# 上記のデバッグシンボルにUnityが付ける.meta
+*.pidb.meta
+*.pdb.meta
+*.mdb.meta
+
+# ---- ビルド・クラッシュレポート ----
+sysinfo.txt
+*.apk
+*.aab
+*.unitypackage
+*.unitypackage.meta
+*.app
+crashlytics-buildid.txt

@@ -33,6 +33,9 @@ public class GridObjectPool : MonoBehaviour
         while (stack.Count > 0 && instance == null)
         {
             instance = stack.Pop();
+
+            // Unityの == null は破棄済みObjectでもtrueになります。参照自体は残っている
+            // （破棄済みだがnullではない）場合だけ、元Prefabとの対応表から取り除きます。
             if (instance == null && !ReferenceEquals(instance, null))
                 _sources.Remove(instance);
         }

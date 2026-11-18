@@ -2,98 +2,30 @@ using UnityEngine;
 using System.Collections.Generic;
 
 /// <summary>
-///    ゲーム全体のマスを管理する。
-///    責務
-///    マス生成
-///    マス取得
-///    座標変換
-///     空きマス判定
-///    オブジェクト配置
+/// ゲーム全体のマスを管理する。
+/// 責務:
+///   ・マス生成
+///   ・マス取得
+///   ・座標変換
+///   ・空きマス判定
+///   ・オブジェクト配置
+///
+/// 登録・移動系のメソッドは、条件を満たさない場合は何も変更せずfalseを返します。
 /// </summary>
 public class GridManager : MonoBehaviour
 {
-    /// <summary>
-    /// 指定されたグリッド座標に存在するアイテムを取得する。
-    /// </summary>
-    /// <param name="position"></param>
-    /// <returns></returns>
-    public Item GetItem(Vector3Int position) => GetCell(position)?.Item;
-
-    /// <summary>
-    /// 指定されたグリッド座標にアイテムを配置できるかどうかを判定する。
-    /// </summary>
-    /// <param name="position"></param>
-    /// <returns></returns>
-    public bool CanPlaceItem(Vector3Int position)
-    {
-        GridCell cell = GetCell(position);
-        return cell != null && cell.Item == null && cell.Block == null && !cell.IsReserved;
-    }
-
-    /// <summary>
-    /// 指定されたグリッド座標にアイテムを登録する。
-    /// </summary>
-    /// <param name="position"></param>
-    /// <param name="item"></param>
-    /// <returns></returns>
-    public bool TryRegisterItem(Vector3Int position, Item item)
-        => CanPlaceItem(position) && GetCell(position).TrySetItem(item);
-
-    /// <summary>
-    /// 指定されたグリッド座標からアイテムを登録解除する。
-    /// </summary>
-    /// <param name="position"></param>
-    /// <param name="item"></param>
-    /// <returns></returns>
-    public bool TryUnregisterItem(Vector3Int position, Item item)
-        => GetCell(position) != null && GetCell(position).RemoveItem(item);
-
-    /// <summary>移動元を照合し、移動先を確保してからItemの登録を移します。</summary>
-    public bool TryMoveItem(Vector3Int from, Vector3Int to, Item item)
-    {
-        if (item == null || GetItem(from) != item || !TryRegisterItem(to, item)) return false;
-        if (TryUnregisterItem(from, item)) return true;
-        TryUnregisterItem(to, item);
-        return false;
-    }
-
-    public int CountItems()
-    {
-        int count = 0;
-        for (int x = 0; x < Size.x; x++)
-        for (int y = 0; y < Size.y; y++)
-        for (int z = 0; z < Size.z; z++)
-            if (GetItem(new Vector3Int(x, y, z)) != null) count++;
-        return count;
-    }
-    public Vector3Int Size => _settings != null ? _settings.Size : Vector3Int.zero;
-
     [SerializeField] private GridSettings _settings;
 
     private GridCell[][][] _cells;
+
     // 通常セルは0～Size-1のまま。外殻だけ別管理し、負座標を配列添字にしません。
     private readonly Dictionary<Vector3Int, Block> _boundaryBlocks = new();
 
-    /// <summary>内部を厚さ1セルで囲う外殻座標か。15セルなら各軸-1～15です。</summary>
-    public bool IsBoundaryPosition(Vector3Int position)
-    {
-        Vector3Int size = Size;
-        return size.x > 0 && size.y > 0 && size.z > 0 &&
-               position.x >= -1 && position.x <= size.x &&
-               position.y >= -1 && position.y <= size.y &&
-               position.z >= -1 && position.z <= size.z && !Contains(position);
-    }
+    /// <summary>グリッド全体のセル数です。Settings未設定ならゼロです。</summary>
+    public Vector3Int Size => _settings != null ? _settings.Size : Vector3Int.zero;
 
-    /// <summary>外殻には破壊不可Blockのみを登録します。通常の配置APIからは配置できません。</summary>
-    public bool TryRegisterBoundaryBlock(Vector3Int position, Block block)
-    {
-        if (!IsBoundaryPosition(position) || block == null || block.Type != BlockType.Unbreakable)
-            return false;
-        if (_boundaryBlocks.TryGetValue(position, out Block existing) && existing != null)
-            return false;
-        _boundaryBlocks[position] = block;
-        return true;
-    }
+    /// <summary>1セルのワールド幅です。</summary>
+    public float CellSize => _settings.CellSize;
 
     private void Awake()
     {
@@ -112,16 +44,18 @@ public class GridManager : MonoBehaviour
     {
         Vector3Int size = _settings.Size;
         _cells = new GridCell[size.x][][];
+
         for (int x = 0; x < size.x; x++)
         {
             _cells[x] = new GridCell[size.y][];
+
             for (int y = 0; y < size.y; y++)
             {
                 _cells[x][y] = new GridCell[size.z];
+
                 for (int z = 0; z < size.z; z++)
                 {
-                    // グリッド座標を計算し、GridCellを生成して格納する
-                    // グリッド座標はスタート位置を考慮して計算する
+                    // 配列の添字がそのままグリッド座標になります。
                     Vector3Int position = new Vector3Int(x, y, z);
                     _cells[x][y][z] = new GridCell(position);
                 }
@@ -129,120 +63,107 @@ public class GridManager : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// 指定されたグリッド座標に対応するGridCellを取得する。
-    /// </summary>
-    /// <param name="position"></param>
-    /// <returns></returns>
+    /// <summary>範囲外ならnullを返します。外殻はGridCellを持たないため含みません。</summary>
     private GridCell GetCell(Vector3Int position)
     {
         if (!Contains(position))
             return null;
+
         return _cells[position.x][position.y][position.z];
     }
 
-    /// <summary>
-    /// 指定されたグリッド座標がグリッド内に存在するかどうかを判定する。
-    /// </summary>
-    /// <param name="position"></param>
-    /// <returns></returns>
+    /// <summary>通常セル（0～Size-1）の範囲内ならtrueです。外殻は含みません。</summary>
     public bool Contains(Vector3Int position)
         => _settings != null && GridUtility.IsInside(position, _settings.Size);
 
-    /// <summary>
-    /// 指定されたグリッド座標をワールド座標に変換する。
-    /// </summary>
-    /// <param name="position"></param>
-    /// <returns></returns>
+    /// <summary>内部を厚さ1セルで囲う外殻座標か。15セルなら各軸-1～15です。</summary>
+    public bool IsBoundaryPosition(Vector3Int position)
+    {
+        Vector3Int size = Size;
+
+        return size.x > 0 && size.y > 0 && size.z > 0 &&
+               position.x >= -1 && position.x <= size.x &&
+               position.y >= -1 && position.y <= size.y &&
+               position.z >= -1 && position.z <= size.z &&
+               !Contains(position);
+    }
+
+    /// <summary>セル中心のワールド座標を返します。</summary>
     public Vector3 GetWorldPosition(Vector3Int position)
         => GridUtility.GridToWorld(position, _settings.CellSize, transform.position);
 
-    /// <summary>
-    /// 指定されたワールド座標をグリッド座標に変換する。
-    /// </summary>
-    /// <param name="worldPosition"></param>
-    /// <returns></returns>
     public Vector3Int GetGridPosition(Vector3 worldPosition)
         => GridUtility.WorldToGrid(worldPosition, _settings.CellSize, transform.position);
 
     /// <summary>
-    /// 指定されたグリッド座標にキャラクターが入れるかどうかを判定する。
+    /// Characterが落下して入れるセルか判定します（GridCell.IsWalkable）。
+    /// Bombは妨げにならないため、CanCharacterEnterとは結果が異なります。
     /// </summary>
-    /// <param name="position"></param>
-    /// <returns></returns>
     public bool CanEnter(Vector3Int position)
     {
-        if (!Contains(position))
-            return false;
         GridCell cell = GetCell(position);
         return cell != null && cell.IsWalkable;
     }
 
-    /// <summary>指定セルにBlockが登録されているかを返します。</summary>
     public bool HasBlock(Vector3Int position)
     {
         return GetBlock(position) != null;
     }
 
-    /// <summary>
-    /// 指定セルに存在するBlockを返します。
-    /// 通常セルに加えて外殻も取得します。それ以外の範囲外はnullを返します。
-    /// </summary>
+    /// <summary>通常セルに加えて外殻のBlockも返します。それ以外の範囲外はnullです。</summary>
     public Block GetBlock(Vector3Int position)
     {
         GridCell cell = GetCell(position);
-        if (cell != null) return cell.Block;
+        if (cell != null)
+            return cell.Block;
+
         return _boundaryBlocks.TryGetValue(position, out Block boundary) ? boundary : null;
     }
 
-    /// <summary>
-    /// 指定セルに存在するCharacterを返します。
-    /// セルが範囲外、またはCharacterが存在しない場合はnullを返します。
-    /// </summary>
     public CharacterBase GetCharacter(Vector3Int position)
     {
         GridCell cell = GetCell(position);
         return cell?.Character;
     }
 
-    /// <summary>
-    /// 指定セルに存在するBombを返します。
-    /// セルが範囲外、またはBombが存在しない場合はnullを返します。
-    /// </summary>
     public Bomb GetBomb(Vector3Int position)
     {
         GridCell cell = GetCell(position);
         return cell?.Bomb;
     }
 
-    /// <summary>
-    /// 落下中のBlockが指定セルを通過できるか判定します。
-    /// Characterは押し潰す対象なので、Blockの落下を妨げません。
-    /// </summary>
-    public bool TryRegisterFallingBlock(Vector3Int position, Block block)
-        => CanFallingBlockEnter(position) && GetCell(position).TrySetBlock(block);
+    public Item GetItem(Vector3Int position) => GetCell(position)?.Item;
 
-    public bool CanFallingBlockEnter(Vector3Int position)
+    public int CountItems()
     {
-        GridCell cell = GetCell(position);
+        int count = 0;
 
-        return cell != null &&
-               cell.Block == null &&
-               cell.Bomb == null &&
-               !cell.IsReserved;
+        for (int x = 0; x < Size.x; x++)
+        {
+            for (int y = 0; y < Size.y; y++)
+            {
+                for (int z = 0; z < Size.z; z++)
+                {
+                    if (GetItem(new Vector3Int(x, y, z)) != null)
+                        count++;
+                }
+            }
+        }
+
+        return count;
     }
 
     /// <summary>
     /// 方向先にある1段高いBlockの上へジャンプできるかを判定します。
     /// 成功時はBlock上の着地セルを返します。
     /// </summary>
-    public bool CanJumpUp( Vector3Int currentPosition,Vector3Int direction,out Vector3Int landingPosition)
+    public bool CanJumpUp(Vector3Int currentPosition, Vector3Int direction, out Vector3Int landingPosition)
     {
         landingPosition = currentPosition;
 
-        if (direction.y != 0 || Mathf.Abs(direction.x) + Mathf.Abs(direction.z) != 1)
+        if (!GridUtility.IsHorizontalUnit(direction))
             return false;
-        
+
         Vector3Int blockPosition = currentPosition + direction;
         landingPosition = blockPosition + Vector3Int.up;
 
@@ -255,7 +176,72 @@ public class GridManager : MonoBehaviour
                landingCell.IsWalkable;
     }
 
-    /// <summary>指定セルへBlockを配置できるかを判定します。</summary>
+    /// <summary>Block・Bomb・Characterのいずれもないセルならtrueです。</summary>
+    public bool CanCharacterEnter(Vector3Int position)
+    {
+        GridCell cell = GetCell(position);
+
+        return cell != null &&
+               cell.Block == null &&
+               cell.Bomb == null &&
+               cell.Character == null;
+    }
+
+    public bool TryRegisterCharacter(Vector3Int position, CharacterBase character)
+    {
+        GridCell cell = GetCell(position);
+
+        if (!CanCharacterEnter(position))
+            return false;
+
+        return cell.TrySetCharacter(character);
+    }
+
+    public bool TryUnregisterCharacter(Vector3Int position, CharacterBase character)
+    {
+        GridCell cell = GetCell(position);
+
+        if (cell == null)
+            return false;
+
+        return cell.RemoveCharacter(character);
+    }
+
+    public bool TryMoveCharacter(Vector3Int from, Vector3Int to, CharacterBase character)
+    {
+        GridCell fromCell = GetCell(from);
+        GridCell toCell = GetCell(to);
+
+        if (fromCell == null || toCell == null || !CanCharacterEnter(to))
+            return false;
+
+        return Transfer(
+            fromCell,
+            toCell,
+            cell => cell.TrySetCharacter(character),
+            cell => cell.RemoveCharacter(character));
+    }
+
+    /// <summary>
+    /// 移動先を先に確保してから移動元を解除します。解除に失敗したら移動先の確保を取り消します。
+    /// Character・Block・Bombの移動で共通の手順です。
+    /// </summary>
+    private static bool Transfer(
+        GridCell fromCell,
+        GridCell toCell,
+        System.Func<GridCell, bool> trySet,
+        System.Func<GridCell, bool> remove)
+    {
+        if (!trySet(toCell))
+            return false;
+
+        if (remove(fromCell))
+            return true;
+
+        remove(toCell);
+        return false;
+    }
+
     public bool CanPlaceBlock(Vector3Int position)
     {
         return CanPlaceBlock(position, out _);
@@ -276,28 +262,19 @@ public class GridManager : MonoBehaviour
 
         if (cell.Block != null)
         {
-            failureReason =
-                $"対象セル {position} にはBlock '{cell.Block.name}' が存在します。";
+            failureReason = $"対象セル {position} にはBlock '{cell.Block.name}' が存在します。";
             return false;
         }
 
         if (cell.Bomb != null)
         {
-            failureReason =
-                $"対象セル {position} にはBomb '{cell.Bomb.name}' が存在します。";
+            failureReason = $"対象セル {position} にはBomb '{cell.Bomb.name}' が存在します。";
             return false;
         }
 
         if (cell.Character != null)
         {
-            failureReason =
-                $"対象セル {position} にはCharacter '{cell.Character.name}' が存在します。";
-            return false;
-        }
-
-        if (cell.IsReserved)
-        {
-            failureReason = $"対象セル {position} は予約されています。";
+            failureReason = $"対象セル {position} にはCharacter '{cell.Character.name}' が存在します。";
             return false;
         }
 
@@ -305,7 +282,75 @@ public class GridManager : MonoBehaviour
         return true;
     }
 
-    /// <summary>指定セルへBombを配置できるかを判定します。</summary>
+    /// <summary>
+    /// 落下中のBlockが指定セルを通過できるか判定します。
+    /// Characterは押し潰す対象なので、Blockの落下を妨げません。
+    /// </summary>
+    public bool CanFallingBlockEnter(Vector3Int position)
+    {
+        GridCell cell = GetCell(position);
+
+        return cell != null &&
+               cell.Block == null &&
+               cell.Bomb == null;
+    }
+
+    /// <summary>
+    /// 落下Blockとして指定セルへ登録します。Characterがいても登録でき、落下時に押し潰します。
+    /// </summary>
+    public bool TryRegisterFallingBlock(Vector3Int position, Block block)
+        => CanFallingBlockEnter(position) && GetCell(position).TrySetBlock(block);
+
+    public bool TryRegisterBlock(Vector3Int position, Block block)
+    {
+        if (!CanPlaceBlock(position))
+            return false;
+
+        GridCell cell = GetCell(position);
+        return cell.TrySetBlock(block);
+    }
+
+    /// <summary>外殻には破壊不可Blockのみを登録します。通常の配置APIからは配置できません。</summary>
+    public bool TryRegisterBoundaryBlock(Vector3Int position, Block block)
+    {
+        if (!IsBoundaryPosition(position) || block == null || block.Type != BlockType.Unbreakable)
+            return false;
+
+        if (_boundaryBlocks.TryGetValue(position, out Block existing) && existing != null)
+            return false;
+
+        _boundaryBlocks[position] = block;
+        return true;
+    }
+
+    /// <summary>外殻Blockにも対応します。</summary>
+    public bool TryUnregisterBlock(Vector3Int position, Block block)
+    {
+        if (_boundaryBlocks.TryGetValue(position, out Block boundary) && boundary == block)
+            return _boundaryBlocks.Remove(position);
+
+        GridCell cell = GetCell(position);
+        if (cell == null || cell.Block != block)
+            return false;
+
+        return cell.RemoveBlock(block);
+    }
+
+    public bool TryMoveBlock(Vector3Int from, Vector3Int to, Block block)
+    {
+        GridCell fromCell = GetCell(from);
+        GridCell toCell = GetCell(to);
+
+        if (fromCell == null || toCell == null || fromCell.Block != block || !CanFallingBlockEnter(to))
+            return false;
+
+        return Transfer(
+            fromCell,
+            toCell,
+            cell => cell.TrySetBlock(block),
+            cell => cell.RemoveBlock(block));
+    }
+
     public bool CanPlaceBomb(Vector3Int position)
     {
         return CanPlaceBomb(position, out _);
@@ -337,184 +382,10 @@ public class GridManager : MonoBehaviour
             return false;
         }
 
-        if (cell.IsReserved)
-        {
-            failureReason = $"対象セル {position} は予約されています。";
-            return false;
-        }
-
         failureReason = string.Empty;
         return true;
     }
 
-    /// <summary>
-    /// 指定されたグリッド座標から別のグリッド座標にキャラクターを移動させる。
-    /// </summary>
-    /// <param name="from"></param>
-    /// <param name="to"></param>
-    /// <param name="character"></param>
-    /// <returns></returns>
-    public bool TryMoveCharacter(Vector3Int from, Vector3Int to, CharacterBase character)
-    {
-        GridCell fromCell = GetCell(from);
-        GridCell toCell = GetCell(to);
-        if (fromCell == null || toCell == null)
-            return false;
-        if (!CanCharacterEnter(to))
-            return false;
-        // 先に移動先を確保する
-        if (!toCell.TrySetCharacter(character))
-            return false;
-        // 移動元の解除に失敗したら元へ戻す
-        if (!fromCell.RemoveCharacter(character))
-        {
-            toCell.RemoveCharacter(character);
-            return false;
-        }
-
-        return true;
-    }
-
-    /// <summary>
-    /// 指定されたグリッド座標にキャラクターが進入できるかを判定します。
-    /// </summary>
-    /// <param name="position"></param>
-    /// <returns></returns>
-    public bool CanCharacterEnter(Vector3Int position)
-    {
-        GridCell cell = GetCell(position);
-
-        return cell != null &&
-           cell.Block == null &&
-           cell.Bomb == null &&
-           cell.Character == null &&
-           !cell.IsReserved;
-    }
-
-    /// <summary>
-    /// 指定されたグリッド座標にキャラクターを登録する。
-    /// </summary>
-    /// <param name="position"></param>
-    /// <param name="character"></param>
-    /// <returns></returns>
-    public bool TryRegisterCharacter(Vector3Int position,CharacterBase character)
-    {
-        GridCell cell = GetCell(position);
-
-        if (!CanCharacterEnter(position))
-            return false;
-
-        return cell.TrySetCharacter(character);
-    }
-
-    /// <summary>
-    /// 指定されたグリッド座標からキャラクターを登録解除する。
-    /// </summary>
-    /// <param name="position"></param>
-    /// <param name="character"></param>
-    /// <returns></returns>
-    public bool TryUnregisterCharacter(Vector3Int position, CharacterBase character)
-    {
-        GridCell cell = GetCell(position);
-
-        if(cell == null)
-            return false;
-
-        return cell.RemoveCharacter(character);
-    }
-
-    /// <summary>
-    /// 指定されたグリッド座標にブロックを配置する。
-    /// </summary>
-    /// <param name="position"></param>
-    /// <param name="block"></param>
-    /// <returns></returns>
-    public bool TryRegisterBlock(Vector3Int position, Block block)
-    {
-        if (!CanPlaceBlock(position))
-            return false;
-
-        GridCell cell = GetCell(position);
-        return cell.TrySetBlock(block);
-    }
-
-    /// <summary>
-    /// 指定されたグリッド座標からブロックを削除する。
-    /// </summary>
-    /// <param name="position"></param>
-    /// <param name="block"></param>
-    /// <returns></returns>
-    public bool TryUnregisterBlock(Vector3Int position, Block block)
-    {
-        if (_boundaryBlocks.TryGetValue(position, out Block boundary) && boundary == block)
-            return _boundaryBlocks.Remove(position);
-        GridCell cell = GetCell(position);
-        if (cell == null || cell.Block != block)
-            return false;
-        return cell.RemoveBlock(block);
-    }
-
-    /// <summary>
-    /// 指定されたグリッド座標から別のグリッド座標にブロックを移動させる。
-    /// </summary>
-    /// <param name="from"></param>
-    /// <param name="to"></param>
-    /// <param name="block"></param>
-    /// <returns></returns>
-    public bool TryMoveBlock(Vector3Int from, Vector3Int to, Block block)
-    {
-        GridCell fromCell = GetCell(from);
-        GridCell toCell = GetCell(to);
-
-        if (fromCell == null || toCell == null)
-            return false;
-        if (fromCell.Block != block || !CanFallingBlockEnter(to))
-            return false;
-        // 先に移動先を確保する
-        if (!toCell.TrySetBlock(block))
-            return false;
-        // 移動元の解除に失敗したら元へ戻す
-        if (!fromCell.RemoveBlock(block))
-        {
-            toCell.RemoveBlock(block);
-            return false;
-        }
-        return true;
-    }
-
-    /// <summary>
-    /// 指定されたグリッド座標から別のグリッド座標に爆弾を移動させる。
-    /// </summary>
-    /// <param name="from"></param>
-    /// <param name="to"></param>
-    /// <param name="bomb"></param>
-    /// <returns></returns>
-    public bool TryMoveBomb(Vector3Int from, Vector3Int to, Bomb bomb)
-    {
-        GridCell fromCell = GetCell(from);
-        GridCell toCell = GetCell(to);
-        if (fromCell == null || toCell == null)
-            return false;
-        if (fromCell.Bomb != bomb || !CanPlaceBomb(to))
-            return false;
-        // 先に移動先を確保する
-        if (!toCell.TrySetBomb(bomb))
-            return false;
-        // 移動元の解除に失敗したら元へ戻す
-        if (!fromCell.RemoveBomb(bomb))
-        {
-            toCell.RemoveBomb(bomb);
-            return false;
-        }
-        return true;
-    }
-
-    /// <summary>
-    /// 指定されたグリッド座標に爆弾を登録する。
-    /// </summary>
-    /// <param name="position"></param>
-    /// <param name="bomb"></param>
-    /// <returns></returns>
     public bool TryRegisterBomb(Vector3Int position, Bomb bomb)
     {
         if (!CanPlaceBomb(position))
@@ -524,40 +395,54 @@ public class GridManager : MonoBehaviour
         return cell.TrySetBomb(bomb);
     }
 
-    /// <summary>
-    /// 指定されたグリッド座標から爆弾を登録解除する。
-    /// </summary>
-    /// <param name="position"></param>
-    /// <param name="bomb"></param>
-    /// <returns></returns>
     public bool TryUnregisterBomb(Vector3Int position, Bomb bomb)
     {
         GridCell cell = GetCell(position);
         if (cell == null || cell.Bomb != bomb)
             return false;
+
         return cell.RemoveBomb(bomb);
     }
 
-    /// <summary>
-    /// 指定されたグリッド座標のセルを予約する。予約済みのセルは他のオブジェクトが使用できなくなる。
-    /// </summary>
-    /// <param name="position"></param>
-    /// <returns></returns>
-    public bool TryReserveCell(Vector3Int position)
+    public bool TryMoveBomb(Vector3Int from, Vector3Int to, Bomb bomb)
     {
-        GridCell cell = GetCell(position);
-        if (cell == null || cell.IsReserved)
+        GridCell fromCell = GetCell(from);
+        GridCell toCell = GetCell(to);
+
+        if (fromCell == null || toCell == null || fromCell.Bomb != bomb || !CanPlaceBomb(to))
             return false;
-        cell.Reserve();
-        return true;
+
+        return Transfer(
+            fromCell,
+            toCell,
+            cell => cell.TrySetBomb(bomb),
+            cell => cell.RemoveBomb(bomb));
     }
 
-
-    /// <summary>
-    /// Gizmosを描画するためのメソッド。Unityエディタ上でグリッドの可視化に使用される。
-    /// </summary>
-    private void OnDrawGizmos()
+    /// <summary>ItemはCharacter・Bombと同居できるため、ItemとBlockだけを確認します。</summary>
+    public bool CanPlaceItem(Vector3Int position)
     {
+        GridCell cell = GetCell(position);
+        return cell != null && cell.Item == null && cell.Block == null;
+    }
 
+    public bool TryRegisterItem(Vector3Int position, Item item)
+        => CanPlaceItem(position) && GetCell(position).TrySetItem(item);
+
+    public bool TryUnregisterItem(Vector3Int position, Item item)
+        => GetCell(position)?.RemoveItem(item) == true;
+
+    /// <summary>移動元を照合し、移動先を確保してからItemの登録を移します。</summary>
+    public bool TryMoveItem(Vector3Int from, Vector3Int to, Item item)
+    {
+        if (item == null || GetItem(from) != item || !TryRegisterItem(to, item))
+            return false;
+
+        if (TryUnregisterItem(from, item))
+            return true;
+
+        // 移動元の解除に失敗したら移動先の登録を取り消します。
+        TryUnregisterItem(to, item);
+        return false;
     }
 }

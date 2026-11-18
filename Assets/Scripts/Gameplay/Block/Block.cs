@@ -15,9 +15,11 @@ public enum BlockType
 public class Block : PooledGridObject
 {
     [SerializeField] private BlockSettings _settings;
+
     private GridManager _gridManager;
     private bool _isFalling;
     private bool _isDestroyed;
+
     // 貸出期間ごとの世代。返却後に再開した古いAwaitableを無効化します。
     private int _lifetimeVersion;
 
@@ -31,6 +33,7 @@ public class Block : PooledGridObject
     {
         _gridManager = gridManager;
         GridPosition = gridPosition;
+
         if (_settings == null)
         {
             Debug.LogError("BlockのBlock Settingsが未設定です。", this);
@@ -38,19 +41,22 @@ public class Block : PooledGridObject
             return;
         }
 
-
         BlockOutlineView outline = GetComponent<BlockOutlineView>();
-        if (outline == null) 
+        if (outline == null)
             outline = gameObject.AddComponent<BlockOutlineView>();
+
         outline.Init(gridManager, _settings);
 
         if (crushAtSpawn)
         {
             int version = _lifetimeVersion;
             CrushCharacterAt(gridPosition);
+
             // 死亡イベントが試合を終了させ、プール返却した場合は落下を開始しません。
-            if (_isDestroyed || version != _lifetimeVersion) return;
+            if (_isDestroyed || version != _lifetimeVersion)
+                return;
         }
+
         TryStartFall();
     }
 
@@ -73,7 +79,7 @@ public class Block : PooledGridObject
         // Blockを論理グリッドから外してから、上のBlockを下側から順番に落とします。
         ReevaluateBlocksAbove(_gridManager, destroyedPosition);
 
-        // 未実装: 破壊時のエフェクトと効果音を追加する。
+        // TODO: 破壊時のエフェクトと効果音を追加する。
         ReturnToPool();
         return true;
     }
@@ -81,18 +87,24 @@ public class Block : PooledGridObject
     /// <summary>生成失敗や明示的な削除時も、登録解除後に再利用待ちへ戻します。</summary>
     public void Despawn()
     {
-        if (_isDestroyed) return;
+        if (_isDestroyed)
+            return;
+
         _isDestroyed = true;
+
         if (_gridManager != null && _gridManager.TryUnregisterBlock(GridPosition, this))
             ReevaluateBlocksAbove(_gridManager, GridPosition);
+
         ReturnToPool();
     }
 
     internal override void ClearForPool()
     {
         _lifetimeVersion++;
+
         if (_gridManager != null)
             _gridManager.TryUnregisterBlock(GridPosition, this);
+
         _gridManager = null;
         _isFalling = false;
         _isDestroyed = true;
@@ -118,7 +130,7 @@ public class Block : PooledGridObject
     /// <summary>
     /// Blockが落下可能なら、グリッド上の論理位置を移動して落下を開始します。
     /// </summary>
-    /// <returns></returns>
+    /// <returns>落下を開始したらtrue</returns>
     private bool TryStartFall()
     {
         if (_isDestroyed || _isFalling)
@@ -162,8 +174,7 @@ public class Block : PooledGridObject
         Vector3 startWorldPosition = transform.position;
         int nextGridYToCheck = startGridPosition.y - 1;
 
-        while (this != null && lifetimeVersion == _lifetimeVersion &&
-               !_isDestroyed && elapsedTime < _settings.FallDuration)
+        while (IsSameLifetime(lifetimeVersion) && elapsedTime < _settings.FallDuration)
         {
             elapsedTime += Time.deltaTime;
             float t = _settings.FallDuration <= 0f
@@ -177,46 +188,53 @@ public class Block : PooledGridObject
                 destinationGridPosition.y,
                 t);
 
-            while (nextGridYToCheck >= destinationGridPosition.y &&
-                   currentGridY <= nextGridYToCheck)
-            {
-                CrushCharacterAt(new Vector3Int(
-                    startGridPosition.x,
-                    nextGridYToCheck,
-                    startGridPosition.z));
-
-                // 死亡イベントから盤面リセット等が起きた場合も古い処理を続けません。
-                if (this == null || lifetimeVersion != _lifetimeVersion || _isDestroyed)
-                    return;
-
-                nextGridYToCheck--;
-            }
+            bool alive;
+            (alive, nextGridYToCheck) = CrushPassedCells(
+                startGridPosition, nextGridYToCheck, currentGridY, destinationGridPosition.y, lifetimeVersion);
+            if (!alive)
+                return;
 
             await Awaitable.NextFrameAsync();
         }
 
-        if (this == null || lifetimeVersion != _lifetimeVersion || _isDestroyed)
+        if (!IsSameLifetime(lifetimeVersion))
             return;
 
         // durationが0に近い場合や最終フレームの丸め誤差でも、経路全体を取りこぼさない。
-        while (nextGridYToCheck >= destinationGridPosition.y)
-        {
-            CrushCharacterAt(new Vector3Int(
-                startGridPosition.x,
-                nextGridYToCheck,
-                startGridPosition.z));
-
-            if (this == null || lifetimeVersion != _lifetimeVersion || _isDestroyed)
-                return;
-
-            nextGridYToCheck--;
-        }
+        if (!CrushPassedCells(
+                startGridPosition, nextGridYToCheck, float.NegativeInfinity, destinationGridPosition.y, lifetimeVersion).alive)
+            return;
 
         transform.position = targetWorldPosition;
         _isFalling = false;
+
         // 落下後に再度落下可能か確認
         TryStartFall();
     }
+
+    /// <summary>
+    /// 落下中の列で、nextY から下へ「reachedY以下まで到達した」セルを順に押し潰します。
+    /// 死亡イベントから盤面リセット等が起きて処理を続けられない場合は alive=false を返します。
+    /// </summary>
+    private (bool alive, int nextY) CrushPassedCells(
+        Vector3Int column, int nextY, float reachedY, int destinationY, int lifetimeVersion)
+    {
+        while (nextY >= destinationY && reachedY <= nextY)
+        {
+            CrushCharacterAt(new Vector3Int(column.x, nextY, column.z));
+
+            if (!IsSameLifetime(lifetimeVersion))
+                return (false, nextY);
+
+            nextY--;
+        }
+
+        return (true, nextY);
+    }
+
+    /// <summary>破棄・プール返却されておらず、開始時と同じ貸出期間ならtrueです。</summary>
+    private bool IsSameLifetime(int lifetimeVersion)
+        => this != null && lifetimeVersion == _lifetimeVersion && !_isDestroyed;
 
     /// <summary>指定セルに生存Characterがいれば、落下Blockによる死亡を要求します。</summary>
     private void CrushCharacterAt(Vector3Int position)
@@ -227,7 +245,7 @@ public class Block : PooledGridObject
             return;
 
         Debug.Log(
-            $"Falling Block crushed Character: Block={name}, Cell={position}, Character={character.name}",
+            $"落下ブロックがキャラクターを押し潰しました。ブロック={name}、セル={position}、対象={character.name}",
             this);
 
         character.Kill(DeathCause.FallingBlock);

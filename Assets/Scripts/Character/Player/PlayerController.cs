@@ -6,6 +6,9 @@ using UnityEngine.InputSystem;
 /// </summary>
 public class PlayerController : MonoBehaviour
 {
+    [Tooltip("移動入力の不感帯（入力ベクトルの長さの2乗）。これ未満の入力は無視します。")]
+    [SerializeField, Min(0f)] private float _moveDeadZoneSquared = 0.01f;
+
     private MovementComponent _movementComponent;
     private BlockPlacementComponent _blockPlacementComponent;
     private BombComponent _bombComponent;
@@ -16,7 +19,7 @@ public class PlayerController : MonoBehaviour
     /// <summary>Spawnerからゲーム用Cameraを受け取ります。</summary>
     public void Init(Camera gameCamera)
     {
-        _camera= gameCamera;
+        _camera = gameCamera;
         _movementComponent = GetComponent<MovementComponent>();
         _blockPlacementComponent = GetComponent<BlockPlacementComponent>();
         _bombComponent = GetComponent<BombComponent>();
@@ -98,6 +101,7 @@ public class PlayerController : MonoBehaviour
     {
         if (!context.performed && !context.canceled)
             return;
+
         // canceledのゼロ入力も渡し、キーを離したことをカメラ側に伝えます。
         _cameraSideController?.HandleInput(context.ReadValue<Vector2>());
     }
@@ -109,13 +113,14 @@ public class PlayerController : MonoBehaviour
     }
 
     /// <summary>
-    /// 入力された2Dベクトルをグリッド方向に変換する。入力が正の値の場合は1、負の値の場合は-1、0の場合は0に変換される。
+    /// 入力された2Dベクトルを、カメラ基準のグリッド方向（X/Zのどちらか1軸の±1）に変換する。
+    /// 入力が不感帯未満、またはカメラ未設定の場合はゼロを返す。
     /// </summary>
-    /// <param name="input"></param>
-    /// <returns></returns>
+    /// <param name="input">移動入力</param>
+    /// <returns>グリッド上の移動方向</returns>
     private Vector3Int ConvertToGridDirection(Vector2 input)
     {
-        if (input.sqrMagnitude < 0.01f || _camera == null)
+        if (input.sqrMagnitude < _moveDeadZoneSquared || _camera == null)
             return Vector3Int.zero;
 
         Transform cameraTransform = _camera.transform;

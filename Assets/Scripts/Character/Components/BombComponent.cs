@@ -10,9 +10,10 @@ public class BombComponent : MonoBehaviour
 {
     /// <summary>設置数・アイテム強化による能力が変わったときの通知です。</summary>
     public event System.Action StatsChanged;
+
     /// <summary>設置成功時のみ通知。表示用モーションに使用します。</summary>
     public event System.Action BombPlaced;
-    private InventoryComponent _inventory;
+
     /// <summary>現在盤面に残っている、このCharacterのBomb数です。</summary>
     public int CurrentBombCount => _currentBombCount;
 
@@ -21,12 +22,14 @@ public class BombComponent : MonoBehaviour
 
     public float FuseTime => _settings != null ? _settings.FuseTime : 0f;
     public int ExplosionPower => _settings != null ? _settings.ExplosionPower + BonusPower : 0;
-    // 古いPrefabへInventoryが後から追加されても、その時点の値を参照します。
-    private int BonusCount => GetComponent<InventoryComponent>()?.BombCountBonus ?? 0;
-    private int BonusPower => GetComponent<InventoryComponent>()?.BombPowerBonus ?? 0;
+
+    // _inventoryはAwakeで必ず設定されます。Awake前に参照された場合だけ0として扱います。
+    private int BonusCount => _inventory != null ? _inventory.BombCountBonus : 0;
+    private int BonusPower => _inventory != null ? _inventory.BombPowerBonus : 0;
 
     [SerializeField] private BombSettings _settings;
 
+    private InventoryComponent _inventory;
     private GridManager _gridManager;
     private MovementComponent _movement;
     private CharacterBase _owner;
@@ -37,9 +40,13 @@ public class BombComponent : MonoBehaviour
     {
         _movement = GetComponent<MovementComponent>();
         _owner = GetComponent<CharacterBase>();
+
+        // RequireComponentは付与以前に作られたPrefabへは遡って反映されないため、
         // 既存PrefabにもInventoryを補完し、初回Item取得前から通知を購読します。
         _inventory = GetComponent<InventoryComponent>();
-        if (_inventory == null) _inventory = gameObject.AddComponent<InventoryComponent>();
+        if (_inventory == null)
+            _inventory = gameObject.AddComponent<InventoryComponent>();
+
         _inventory.Changed += NotifyStatsChanged;
     }
 
@@ -100,6 +107,7 @@ public class BombComponent : MonoBehaviour
         _currentBombCount++;
         bomb.Exploded += HandleBombExploded;
         bomb.Init(_gridManager, position, _owner, _settings, ExplosionPower);
+
         // 設置が成功した場合だけ発音します（Player・Enemy共通）。
         AudioManager.PlayAt(SoundId.BombPlace, _gridManager.GetWorldPosition(position));
         NotifyStatsChanged();
@@ -119,6 +127,7 @@ public class BombComponent : MonoBehaviour
 
     private void OnDestroy()
     {
-        if (_inventory != null) _inventory.Changed -= NotifyStatsChanged;
+        if (_inventory != null)
+            _inventory.Changed -= NotifyStatsChanged;
     }
 }

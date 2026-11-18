@@ -29,7 +29,6 @@ public class Bomb : MonoBehaviour
     /// <summary>このBombを設置したCharacterです。</summary>
     public CharacterBase Owner { get; private set; }
 
-    /// <summary>現在のBomb状態です。</summary>
     public BombState State { get; private set; }
 
     /// <summary>爆発までの残り秒数です。</summary>
@@ -122,7 +121,7 @@ public class Bomb : MonoBehaviour
         }
 
         Debug.Log(
-            $"Bomb exploded: Position={GridPosition}, Power={ExplosionPower}",
+            $"ボムが爆発しました。セル={GridPosition}、爆風の威力={ExplosionPower}",
             this);
 
         Exploded?.Invoke(this);

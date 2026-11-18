@@ -4,7 +4,36 @@ using UnityEngine.Rendering;
 /// <summary>取得者に追従する短いネオン演出。消費されるItemから独立して再生します。</summary>
 public class ItemPickupBurst : MonoBehaviour
 {
+    /// <summary>リングを近似する多角形の頂点数です。</summary>
     private const int RingSegments = 48;
+
+    private const string SettingsResourceName = "ItemPickupVisualSettings";
+    private const string ShaderResourceName = "NeonExplosionParticle";
+    private const string TintColorProperty = "_TintColor";
+
+    // Settingsの下限値と同じ値で、0除算や見えないサイズを防ぎます。
+    private const float MinDuration = 0.05f;
+    private const float MinParticleSize = 0.01f;
+    private const float MinStartRadius = 0.01f;
+    private const float MinRingWidth = 0.001f;
+    private const int MinParticleCount = 1;
+    private const int MaxParticleCount = 64;
+
+    /// <summary>黄金角（ラジアン）。粒の向きを偏りなく分散させるのに使います。</summary>
+    private const float GoldenAngleRadians = 2.399963f;
+
+    /// <summary>粒の開始高さを何段階にずらすかです。</summary>
+    private const int HeightTierCount = 5;
+
+    /// <summary>開始高さ1段あたりの差（ワールド単位）です。</summary>
+    private const float HeightTierSpacing = 0.1f;
+
+    /// <summary>粒が外側へ広がる速度です。上昇速度はSettingsで指定します。</summary>
+    private const float ParticleOutwardSpeed = 0.25f;
+
+    /// <summary>演出終了時にリング幅をどれだけ細くするか（0.7なら最後は元の30%）。</summary>
+    private const float RingWidthShrinkRatio = 0.7f;
+
     private Transform _target;
     private ItemPickupVisualSettings _settings;
     private LineRenderer _ring;
@@ -14,18 +43,30 @@ public class ItemPickupBurst : MonoBehaviour
 
     public static void Spawn(CharacterBase character, ItemType type)
     {
-        ItemPickupVisualSettings settings = Resources.Load<ItemPickupVisualSettings>("ItemPickupVisualSettings");
-        if (character == null || settings == null || !settings.Enabled) return;
-        Shader shader = Resources.Load<Shader>("NeonExplosionParticle");
-        if (shader == null) return;
+        ItemPickupVisualSettings settings = Resources.Load<ItemPickupVisualSettings>(SettingsResourceName);
+        if (character == null || settings == null || !settings.Enabled)
+            return;
+
+        Shader shader = Resources.Load<Shader>(ShaderResourceName);
+        if (shader == null)
+            return;
 
         GameObject root = new GameObject("Item Pickup Glow");
         UnityEngine.SceneManagement.SceneManager.MoveGameObjectToScene(root, character.gameObject.scene);
         root.transform.position = character.transform.position;
+
         ItemPickupBurst effect = root.AddComponent<ItemPickupBurst>();
+
         // 初期化中に失敗しても、生成途中のObjectとMaterialを残しません。
-        try { effect.Initialize(character.transform, settings, shader, type); }
-        catch { Destroy(root); throw; }
+        try
+        {
+            effect.Initialize(character.transform, settings, shader, type);
+        }
+        catch
+        {
+            Destroy(root);
+            throw;
+        }
     }
 
     private void Initialize(Transform target, ItemPickupVisualSettings settings, Shader shader, ItemType type)
@@ -34,12 +75,21 @@ public class ItemPickupBurst : MonoBehaviour
         _settings = settings;
         _color = type == ItemType.BombPower ? settings.PowerColor : settings.CountColor;
         _material = new Material(shader) { name = "Item Pickup Glow (Runtime)" };
-        // HDR色はMaterial側に渡し、ParticleのColor32変換で明るさが失われるのを防ぎます。
-        _material.SetColor("_TintColor", _color);
 
+        // HDR色はMaterial側に渡し、ParticleのColor32変換で明るさが失われるのを防ぎます。
+        _material.SetColor(TintColorProperty, _color);
+
+        CreateRing();
+        CreateParticles(settings);
+    }
+
+    /// <summary>広がるリングを生成します。</summary>
+    private void CreateRing()
+    {
         // ParticleSystemRendererとLineRendererを同じObjectへ追加しないよう分離します。
         GameObject ringObject = new GameObject("Pickup Ring");
         ringObject.transform.SetParent(transform, false);
+
         _ring = ringObject.AddComponent<LineRenderer>();
         _ring.sharedMaterial = _material;
         _ring.useWorldSpace = false;
@@ -47,11 +97,18 @@ public class ItemPickupBurst : MonoBehaviour
         _ring.positionCount = RingSegments;
         _ring.shadowCastingMode = ShadowCastingMode.Off;
         _ring.receiveShadows = false;
-        UpdateRing(0f);
 
+        UpdateRing(0f);
+    }
+
+    /// <summary>上昇する光の粒を生成して一度に放出します。</summary>
+    private void CreateParticles(ItemPickupVisualSettings settings)
+    {
         ParticleSystem particles = gameObject.AddComponent<ParticleSystem>();
         particles.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
-        float duration = Mathf.Max(0.05f, settings.Duration);
+
+        float duration = Mathf.Max(MinDuration, settings.Duration);
+
         var main = particles.main;
         main.loop = false;
         main.playOnAwake = false;
@@ -59,37 +116,54 @@ public class ItemPickupBurst : MonoBehaviour
         main.startLifetime = duration;
         main.startSpeed = 0f;
         main.startColor = Color.white;
-        main.startSize = Mathf.Max(0.01f, settings.ParticleSize);
-        main.maxParticles = Mathf.Clamp(settings.ParticleCount, 1, 64);
+        main.startSize = Mathf.Max(MinParticleSize, settings.ParticleSize);
+        main.maxParticles = Mathf.Clamp(settings.ParticleCount, MinParticleCount, MaxParticleCount);
         main.simulationSpace = ParticleSystemSimulationSpace.Local;
         main.useUnscaledTime = true;
+
         var emission = particles.emission;
         emission.enabled = false;
+
         var shape = particles.shape;
         shape.enabled = false;
+
+        // 寿命に合わせて線形に小さくします。
         var size = particles.sizeOverLifetime;
         size.enabled = true;
         size.size = new ParticleSystem.MinMaxCurve(1f, AnimationCurve.Linear(0f, 1f, 1f, 0f));
+
+        // 寿命に合わせて透明にします。
         var fade = particles.colorOverLifetime;
         fade.enabled = true;
+
         Gradient gradient = new Gradient();
-        gradient.SetKeys(new[] { new GradientColorKey(Color.white, 0f), new GradientColorKey(Color.white, 1f) },
+        gradient.SetKeys(
+            new[] { new GradientColorKey(Color.white, 0f), new GradientColorKey(Color.white, 1f) },
             new[] { new GradientAlphaKey(1f, 0f), new GradientAlphaKey(0f, 1f) });
         fade.color = gradient;
+
         var renderer = particles.GetComponent<ParticleSystemRenderer>();
         renderer.sharedMaterial = _material;
         renderer.shadowCastingMode = ShadowCastingMode.Off;
         renderer.receiveShadows = false;
+
         particles.Play();
-        // 等間隔＋黄金角の高さずらし。ゲーム側の乱数シードを消費しません。
+
+        // 黄金角で粒の向きを分散し、開始位置の高さを5段階にずらします。
+        // ゲーム側の乱数列は消費しません。
+        float startRadius = Mathf.Max(MinStartRadius, settings.StartRadius);
+        float riseSpeed = Mathf.Max(0f, settings.ParticleRiseSpeed);
+
         for (int i = 0; i < main.maxParticles; i++)
         {
-            float angle = i * 2.399963f;
+            float angle = i * GoldenAngleRadians;
             Vector3 outward = new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle));
+            float startHeight = settings.StartHeight + (i % HeightTierCount) * HeightTierSpacing;
+
             particles.Emit(new ParticleSystem.EmitParams
             {
-                position = outward * Mathf.Max(0.01f, settings.StartRadius) + Vector3.up * (settings.StartHeight + (i % 5) * 0.1f),
-                velocity = outward * 0.25f + Vector3.up * Mathf.Max(0f, settings.ParticleRiseSpeed)
+                position = outward * startRadius + Vector3.up * startHeight,
+                velocity = outward * ParticleOutwardSpeed + Vector3.up * riseSpeed
             }, 1);
         }
     }
@@ -102,21 +176,30 @@ public class ItemPickupBurst : MonoBehaviour
             Destroy(gameObject);
             return;
         }
+
         transform.position = _target.position;
         _elapsed += Time.unscaledDeltaTime;
-        float progress = Mathf.Clamp01(_elapsed / Mathf.Max(0.05f, _settings.Duration));
+
+        float progress = Mathf.Clamp01(_elapsed / Mathf.Max(MinDuration, _settings.Duration));
         UpdateRing(progress);
-        if (progress >= 1f) Destroy(gameObject);
+
+        if (progress >= 1f)
+            Destroy(gameObject);
     }
 
     private void UpdateRing(float progress)
     {
-        float radius = Mathf.Lerp(_settings.StartRadius, _settings.EndRadius, 1f - (1f - progress) * (1f - progress));
+        // 1-(1-t)^2 のイーズアウトで、最初は速く広がり徐々に減速します。
+        float easedProgress = 1f - (1f - progress) * (1f - progress);
+        float radius = Mathf.Lerp(_settings.StartRadius, _settings.EndRadius, easedProgress);
         float height = _settings.StartHeight + _settings.RiseHeight * progress;
-        _ring.widthMultiplier = Mathf.Max(0.001f, _settings.RingWidth) * (1f - progress * 0.7f);
+
+        _ring.widthMultiplier = Mathf.Max(MinRingWidth, _settings.RingWidth) * (1f - progress * RingWidthShrinkRatio);
+
         Color color = Color.white;
         color.a = 1f - progress;
         _ring.startColor = _ring.endColor = color;
+
         for (int i = 0; i < RingSegments; i++)
         {
             float angle = i * Mathf.PI * 2f / RingSegments;
@@ -126,6 +209,7 @@ public class ItemPickupBurst : MonoBehaviour
 
     private void OnDestroy()
     {
-        if (_material != null) Destroy(_material);
+        if (_material != null)
+            Destroy(_material);
     }
 }

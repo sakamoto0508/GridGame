@@ -12,7 +12,22 @@ using UnityEngine;
 internal sealed class PathSearchHistoryWindow : EditorWindow
 {
     private const string VisualizerMenuPath = "Tools/NEON DETONATOR/AI Debug/Create or Select Visualizer";
+
+    /// <summary>「最近展開したノード」欄に表示する行数です。</summary>
     private const int RecentNodeRows = 8;
+
+    /// <summary>Enemy未選択時に自動検索する間隔（秒）。毎フレーム検索しないよう負荷を抑えます。</summary>
+    private const double BrainSearchIntervalSeconds = 0.5;
+
+    /// <summary>履歴一覧のスクロール領域の高さ（ピクセル）です。</summary>
+    private const float HistoryListHeight = 150f;
+
+    // 再生速度（1秒あたりの展開ステップ数）
+    private const float DefaultStepsPerSecond = 15f;
+    private const float MinStepsPerSecond = 1f;
+    private const float MaxStepsPerSecond = 120f;
+
+    private readonly PathSearchTraceDrawer.Options _options = new PathSearchTraceDrawer.Options();
 
     private EnemyBrain _brain;
     private bool _useSelection = true;
@@ -24,19 +39,18 @@ internal sealed class PathSearchHistoryWindow : EditorWindow
     private PathSearchTrace _trace;
     private int _visibleCount;
     private bool _isPlaying;
-    private float _stepsPerSecond = 15f;
+    private float _stepsPerSecond = DefaultStepsPerSecond;
     private double _lastTickTime;
     private double _nextBrainSearchTime;
     private float _stepAccumulator;
 
-    private readonly PathSearchTraceDrawer.Options _options = new PathSearchTraceDrawer.Options();
     private Vector2 _historyScroll;
     private Vector2 _windowScroll;
 
     [MenuItem("Tools/NEON DETONATOR/AI Debug/Search History Player")]
     private static void Open()
     {
-        GetWindow<PathSearchHistoryWindow>("AI Search History");
+        GetWindow<PathSearchHistoryWindow>("AI探索履歴");
     }
 
     private void OnEnable()
@@ -84,6 +98,7 @@ internal sealed class PathSearchHistoryWindow : EditorWindow
         if (!_isPlaying || _trace == null)
             return;
 
+        // 経過時間×速度を貯め、整数分だけステップを進めます。
         _stepAccumulator += deltaTime * _stepsPerSecond;
         int advance = (int)_stepAccumulator;
         if (advance <= 0)
@@ -91,8 +106,10 @@ internal sealed class PathSearchHistoryWindow : EditorWindow
 
         _stepAccumulator -= advance;
         SetVisibleCount(_visibleCount + advance);
+
         if (_visibleCount >= _trace.ExpandedNodes.Count)
             _isPlaying = false;
+
         Repaint();
     }
 
@@ -108,7 +125,7 @@ internal sealed class PathSearchHistoryWindow : EditorWindow
         // 未選択時の自動検索は負荷を抑えるため0.5秒ごとに限定します。
         if (_brain == null && EditorApplication.timeSinceStartup >= _nextBrainSearchTime)
         {
-            _nextBrainSearchTime = EditorApplication.timeSinceStartup + 0.5;
+            _nextBrainSearchTime = EditorApplication.timeSinceStartup + BrainSearchIntervalSeconds;
             _brain = FindFirstObjectByType<EnemyBrain>();
         }
     }
@@ -117,10 +134,14 @@ internal sealed class PathSearchHistoryWindow : EditorWindow
     {
         if (_brain == null)
             return null;
+
         IReadOnlyList<PathSearchTrace> history = _brain.DebugSearchHistory;
         for (int i = history.Count - 1; i >= 0; i--)
+        {
             if (PassesFilter(history[i]))
                 return history[i];
+        }
+
         return null;
     }
 
@@ -128,10 +149,17 @@ internal sealed class PathSearchHistoryWindow : EditorWindow
     {
         switch (trace.Algorithm)
         {
-            case PathSearchAlgorithm.Bfs: return _showBfs;
-            case PathSearchAlgorithm.AStar: return _showAStar;
-            case PathSearchAlgorithm.Dijkstra: return _showDijkstra;
-            default: return true;
+            case PathSearchAlgorithm.Bfs:
+                return _showBfs;
+
+            case PathSearchAlgorithm.AStar:
+                return _showAStar;
+
+            case PathSearchAlgorithm.Dijkstra:
+                return _showDijkstra;
+
+            default:
+                return true;
         }
     }
 
@@ -144,6 +172,7 @@ internal sealed class PathSearchHistoryWindow : EditorWindow
 
         if (trace != null && trace.ExpandedNodes.Count > 0)
             _options.Layer = trace.Start.y;
+
         SceneView.RepaintAll();
     }
 
@@ -158,7 +187,7 @@ internal sealed class PathSearchHistoryWindow : EditorWindow
     private void TakeManualControl() => _followLatest = false;
 
     // ------------------------------------------------------------------
-    // GUI
+    // 探索履歴ウィンドウの描画
     // ------------------------------------------------------------------
 
     private void OnGUI()
@@ -174,7 +203,8 @@ internal sealed class PathSearchHistoryWindow : EditorWindow
                 "探索履歴を収集していません。シーンのEnemyAIDebugVisualizerで\n" +
                 "Show Gizmos と Record Search History をONにしてください。",
                 MessageType.Warning);
-            if (GUILayout.Button("Create / Select Visualizer"))
+
+            if (GUILayout.Button("Visualizerを作成 / 選択"))
                 EditorApplication.ExecuteMenuItem(VisualizerMenuPath);
         }
 
@@ -190,37 +220,44 @@ internal sealed class PathSearchHistoryWindow : EditorWindow
     private void DrawStatusSection()
     {
         EditorGUILayout.Space();
-        EditorGUILayout.LabelField("Status", EditorStyles.boldLabel);
+        EditorGUILayout.LabelField("状態チェック", EditorStyles.boldLabel);
 
         SceneView sceneView = SceneView.lastActiveSceneView;
-        bool brainGizmoEnabled = !GizmoUtility.TryGetGizmoInfo(typeof(EnemyBrain), out GizmoInfo info) ||
-                                 info.gizmoEnabled;
+        bool brainGizmoEnabled =
+            !GizmoUtility.TryGetGizmoInfo(typeof(EnemyBrain), out GizmoInfo info) ||
+            info.gizmoEnabled;
 
-        StatusLine("Play Mode", EditorApplication.isPlaying);
-        StatusLine("Visualizer in scene & Show Gizmos ON", EnemyAIDebugSettings.Enabled);
-        StatusLine("Recording search history", PathSearchDebug.IsCollecting);
-        StatusLine("Scene view open", sceneView != null);
-        StatusLine("Scene view Gizmos button ON", sceneView != null && sceneView.drawGizmos);
-        StatusLine("Gizmos menu: EnemyBrain checked", brainGizmoEnabled);
-        StatusLine("Enemy found & initialized", _brain != null && _brain.DebugIsReady);
+        StatusLine("Play中", EditorApplication.isPlaying);
+        StatusLine("シーンにVisualizerがあり Show Gizmos がON", EnemyAIDebugSettings.Enabled);
+        StatusLine("探索履歴を記録中", PathSearchDebug.IsCollecting);
+        StatusLine("Sceneビューが開いている", sceneView != null);
+        StatusLine("SceneビューのGizmosボタンがON", sceneView != null && sceneView.drawGizmos);
+        StatusLine("GizmosメニューでEnemyBrainにチェック", brainGizmoEnabled);
+        StatusLine("Enemyが見つかり初期化済み", _brain != null && _brain.DebugIsReady);
+
         if (_brain != null && EditorApplication.isPlaying)
         {
-            EditorGUILayout.LabelField("Last bomb decision",
-                _brain.DebugLastBombDecision == EnemyBrain.BombAttemptResult.None
-                    ? "-"
-                    : $"{_brain.DebugLastBombDecision} ({Time.time - _brain.DebugLastBombDecisionTime:0.0}s ago)");
+            string lastDecision = _brain.DebugLastBombDecision == EnemyBrain.BombAttemptResult.None
+                ? "-"
+                : $"{_brain.DebugLastBombDecision}（{Time.time - _brain.DebugLastBombDecisionTime:0.0}秒前）";
+
+            EditorGUILayout.LabelField("直近のBomb設置判定", lastDecision);
         }
     }
 
     private static void StatusLine(string label, bool ok)
     {
-        EditorGUILayout.LabelField(label, ok ? "✔ OK" : "✘ NG", ok ? EditorStyles.label : EditorStyles.boldLabel);
+        EditorGUILayout.LabelField(
+            label,
+            ok ? "✔ OK" : "✘ NG",
+            ok ? EditorStyles.label : EditorStyles.boldLabel);
     }
 
     private void DrawTargetSection()
     {
         EditorGUILayout.Space();
-        EditorGUILayout.LabelField("Target", EditorStyles.boldLabel);
+        EditorGUILayout.LabelField("対象", EditorStyles.boldLabel);
+
         EditorGUI.BeginChangeCheck();
         EnemyBrain brain = (EnemyBrain)EditorGUILayout.ObjectField("Enemy", _brain, typeof(EnemyBrain), true);
         if (EditorGUI.EndChangeCheck())
@@ -228,7 +265,8 @@ internal sealed class PathSearchHistoryWindow : EditorWindow
             _brain = brain;
             SelectTrace(null, false);
         }
-        _useSelection = EditorGUILayout.Toggle("Use Hierarchy Selection", _useSelection);
+
+        _useSelection = EditorGUILayout.Toggle("Hierarchyの選択を使う", _useSelection);
 
         EditorGUILayout.BeginHorizontal();
         _showBfs = GUILayout.Toggle(_showBfs, "BFS", EditorStyles.miniButtonLeft);
@@ -236,13 +274,13 @@ internal sealed class PathSearchHistoryWindow : EditorWindow
         _showDijkstra = GUILayout.Toggle(_showDijkstra, "Dijkstra", EditorStyles.miniButtonRight);
         EditorGUILayout.EndHorizontal();
 
-        _followLatest = EditorGUILayout.ToggleLeft("Follow Latest Search", _followLatest);
+        _followLatest = EditorGUILayout.ToggleLeft("最新の探索に追従", _followLatest);
     }
 
     private void DrawHistorySection()
     {
         EditorGUILayout.Space();
-        EditorGUILayout.LabelField("History (newest first)", EditorStyles.boldLabel);
+        EditorGUILayout.LabelField("履歴（新しい順）", EditorStyles.boldLabel);
 
         if (_brain == null || !EditorApplication.isPlaying)
         {
@@ -251,20 +289,26 @@ internal sealed class PathSearchHistoryWindow : EditorWindow
         }
 
         IReadOnlyList<PathSearchTrace> history = _brain.DebugSearchHistory;
-        _historyScroll = EditorGUILayout.BeginScrollView(_historyScroll, GUILayout.Height(150f));
+        _historyScroll = EditorGUILayout.BeginScrollView(_historyScroll, GUILayout.Height(HistoryListHeight));
+
         for (int i = history.Count - 1; i >= 0; i--)
         {
             PathSearchTrace trace = history[i];
             if (!PassesFilter(trace))
                 continue;
 
-            bool isSelectedItem = trace.Algorithm == PathSearchAlgorithm.Dijkstra && trace.HasTarget &&
-                                  _brain.DebugHasItemTarget && trace.Target == _brain.DebugItemTargetPosition;
-            string result = trace.Succeeded ? $"path {trace.FinalPathStepCount}" : "no path";
+            // 現在追っているItemへのDijkstra探索には★を付けます。
+            bool isSelectedItem =
+                trace.Algorithm == PathSearchAlgorithm.Dijkstra &&
+                trace.HasTarget &&
+                _brain.DebugHasItemTarget &&
+                trace.Target == _brain.DebugItemTargetPosition;
+
+            string result = trace.Succeeded ? $"経路 {trace.FinalPathStepCount}手" : "経路なし";
             string text =
                 $"{trace.CreatedAt,7:0.00}s  [{PathSearchTraceDrawer.GetAlgorithmName(trace.Algorithm)}] " +
                 $"{trace.Label}{(isSelectedItem ? " ★" : "")}  " +
-                $"exp {trace.ExpandedCount}{(trace.IsTruncated ? "+" : "")}  {result}";
+                $"展開 {trace.ExpandedCount}{(trace.IsTruncated ? "+" : "")}  {result}";
 
             bool isCurrent = trace == _trace;
             if (GUILayout.Toggle(isCurrent, text, EditorStyles.toolbarButton) && !isCurrent)
@@ -273,6 +317,7 @@ internal sealed class PathSearchHistoryWindow : EditorWindow
                 SelectTrace(trace, true);
             }
         }
+
         EditorGUILayout.EndScrollView();
     }
 
@@ -284,19 +329,26 @@ internal sealed class PathSearchHistoryWindow : EditorWindow
         IReadOnlyList<PathSearchNodeRecord> nodes = _trace.ExpandedNodes;
 
         EditorGUILayout.Space();
-        EditorGUILayout.LabelField("Selected Search", EditorStyles.boldLabel);
-        EditorGUILayout.LabelField("Algorithm",
+        EditorGUILayout.LabelField("選択中の探索", EditorStyles.boldLabel);
+
+        EditorGUILayout.LabelField(
+            "アルゴリズム",
             $"{PathSearchTraceDrawer.GetAlgorithmName(_trace.Algorithm)}  ({_trace.Label})");
-        EditorGUILayout.LabelField("Start", Format(_trace.Start));
-        EditorGUILayout.LabelField("Target", _trace.HasTarget ? Format(_trace.Target) : "nearest safe cell");
-        EditorGUILayout.LabelField("Expanded Nodes",
+
+        EditorGUILayout.LabelField("開始", EnemyAIDebugGizmoDrawer.Format(_trace.Start));
+
+        EditorGUILayout.LabelField("目標", _trace.HasTarget ? EnemyAIDebugGizmoDrawer.Format(_trace.Target) : "最寄りの安全セル");
+
+        EditorGUILayout.LabelField(
+            "展開ノード数",
             _trace.IsTruncated
-                ? $"{_trace.ExpandedCount} (recorded {nodes.Count}, limit reached)"
+                ? $"{_trace.ExpandedCount}（記録 {nodes.Count}、上限に到達）"
                 : _trace.ExpandedCount.ToString());
-        EditorGUILayout.LabelField("Final Path",
-            _trace.Succeeded
-                ? $"{_trace.FinalPathStepCount} steps, cost {_trace.FinalCost:0.00}s → {Format(_trace.FinalPath[_trace.FinalPath.Count - 1])}"
-                : "not found");
+
+        string finalPath = _trace.Succeeded
+            ? $"{_trace.FinalPathStepCount}手、コスト {_trace.FinalCost:0.00}秒 → {EnemyAIDebugGizmoDrawer.Format(_trace.FinalPath[_trace.FinalPath.Count - 1])}"
+            : "見つかりませんでした";
+        EditorGUILayout.LabelField("最終経路", finalPath);
 
         DrawPlaybackControls(nodes.Count);
         DrawCurrentNode(nodes);
@@ -306,47 +358,60 @@ internal sealed class PathSearchHistoryWindow : EditorWindow
     private void DrawPlaybackControls(int nodeCount)
     {
         EditorGUILayout.Space();
-        EditorGUILayout.LabelField("Playback", EditorStyles.boldLabel);
+        EditorGUILayout.LabelField("再生", EditorStyles.boldLabel);
 
         EditorGUILayout.BeginHorizontal();
-        if (GUILayout.Button("|◀ Reset"))
+
+        if (GUILayout.Button("|◀ 最初へ"))
         {
             TakeManualControl();
             _isPlaying = false;
             SetVisibleCount(0);
         }
-        if (GUILayout.Button("◀ Step"))
+
+        if (GUILayout.Button("◀ 1つ戻る"))
         {
             TakeManualControl();
             _isPlaying = false;
             SetVisibleCount(_visibleCount - 1);
         }
-        if (GUILayout.Button(_isPlaying ? "❚❚ Pause" : "▶ Play"))
+
+        if (GUILayout.Button(_isPlaying ? "❚❚ 一時停止" : "▶ 再生"))
         {
             TakeManualControl();
+
+            // 最後まで表示済みなら、最初から再生し直します。
             if (!_isPlaying && _visibleCount >= nodeCount)
                 SetVisibleCount(0);
+
             _isPlaying = !_isPlaying;
             _stepAccumulator = 0f;
         }
-        if (GUILayout.Button("Step ▶"))
+
+        if (GUILayout.Button("1つ進む ▶"))
         {
             TakeManualControl();
             _isPlaying = false;
             SetVisibleCount(_visibleCount + 1);
         }
-        if (GUILayout.Button("End ▶|"))
+
+        if (GUILayout.Button("最後へ ▶|"))
         {
             TakeManualControl();
             _isPlaying = false;
             SetVisibleCount(nodeCount);
         }
+
         EditorGUILayout.EndHorizontal();
 
-        _stepsPerSecond = EditorGUILayout.Slider("Steps / sec", _stepsPerSecond, 1f, 120f);
+        _stepsPerSecond = EditorGUILayout.Slider(
+            "再生速度（ステップ/秒）",
+            _stepsPerSecond,
+            MinStepsPerSecond,
+            MaxStepsPerSecond);
 
         EditorGUI.BeginChangeCheck();
-        int step = EditorGUILayout.IntSlider("Step", _visibleCount, 0, nodeCount);
+        int step = EditorGUILayout.IntSlider("ステップ", _visibleCount, 0, nodeCount);
         if (EditorGUI.EndChangeCheck())
         {
             TakeManualControl();
@@ -358,7 +423,7 @@ internal sealed class PathSearchHistoryWindow : EditorWindow
     private void DrawCurrentNode(IReadOnlyList<PathSearchNodeRecord> nodes)
     {
         EditorGUILayout.Space();
-        EditorGUILayout.LabelField("Recently Expanded", EditorStyles.boldLabel);
+        EditorGUILayout.LabelField("最近展開したノード", EditorStyles.boldLabel);
 
         if (_visibleCount <= 0)
         {
@@ -367,14 +432,18 @@ internal sealed class PathSearchHistoryWindow : EditorWindow
         }
 
         int first = Mathf.Max(0, _visibleCount - RecentNodeRows);
+
         for (int i = _visibleCount - 1; i >= first; i--)
         {
             PathSearchNodeRecord node = nodes[i];
-            string action = node.HasAction ? node.Action.ToString() : "start";
-            string parent = node.HasParent ? Format(node.ParentPosition) : "-";
-            string virtualBlock = node.HasVirtualBlock ? $"  VB{Format(node.VirtualBlock)}" : "";
+            string action = node.HasAction ? node.Action.ToString() : "開始";
+            string parent = node.HasParent ? EnemyAIDebugGizmoDrawer.Format(node.ParentPosition) : "-";
+
+            // VB = 経路中に仮想設置したBlock（Virtual Block）
+            string virtualBlock = node.HasVirtualBlock ? $"  VB{EnemyAIDebugGizmoDrawer.Format(node.VirtualBlock)}" : "";
+
             EditorGUILayout.LabelField(
-                $"#{node.Order}  {Format(node.Position)}  y{node.Position.y}",
+                $"#{node.Order}  {EnemyAIDebugGizmoDrawer.Format(node.Position)}  y{node.Position.y}",
                 $"{PathSearchTraceDrawer.FormatCost(_trace.Algorithm, node, true)}  ← {parent} [{action}]{virtualBlock}",
                 i == _visibleCount - 1 ? EditorStyles.boldLabel : EditorStyles.label);
         }
@@ -383,23 +452,26 @@ internal sealed class PathSearchHistoryWindow : EditorWindow
     private void DrawDisplayOptions(IReadOnlyList<PathSearchNodeRecord> nodes)
     {
         EditorGUILayout.Space();
-        EditorGUILayout.LabelField("Display", EditorStyles.boldLabel);
+        EditorGUILayout.LabelField("表示", EditorStyles.boldLabel);
 
         EditorGUI.BeginChangeCheck();
-        _options.ShowOrderLabels = EditorGUILayout.Toggle("Order Labels (#n, y)", _options.ShowOrderLabels);
+
+        _options.ShowOrderLabels = EditorGUILayout.Toggle("展開順ラベル (#n, y)", _options.ShowOrderLabels);
         _options.ShowCostLabels = EditorGUILayout.Toggle(
-            _trace.Algorithm == PathSearchAlgorithm.AStar ? "Cost Labels (g/h/f)" : "Cost Labels (time)",
+            _trace.Algorithm == PathSearchAlgorithm.AStar ? "コストラベル (g/h/f)" : "コストラベル (時間)",
             _options.ShowCostLabels);
-        _options.ShowParentLinks = EditorGUILayout.Toggle("Parent Links", _options.ShowParentLinks);
-        _options.ShowFinalPathAlways = EditorGUILayout.Toggle("Final Path Always", _options.ShowFinalPathAlways);
+        _options.ShowParentLinks = EditorGUILayout.Toggle("親ノードへの線", _options.ShowParentLinks);
+        _options.ShowFinalPathAlways = EditorGUILayout.Toggle("最終経路を常に表示", _options.ShowFinalPathAlways);
 
         GetLayerRange(nodes, out int minY, out int maxY);
-        _options.FilterByLayer = EditorGUILayout.Toggle("Filter Y Layer", _options.FilterByLayer);
+        _options.FilterByLayer = EditorGUILayout.Toggle("Y階層で絞り込む", _options.FilterByLayer);
+
         using (new EditorGUI.DisabledScope(!_options.FilterByLayer))
         {
-            _options.Layer = EditorGUILayout.IntSlider("Y Layer", _options.Layer, minY, Mathf.Max(minY, maxY));
-            _options.DimOtherLayers = EditorGUILayout.Toggle("Dim Other Layers", _options.DimOtherLayers);
+            _options.Layer = EditorGUILayout.IntSlider("Y階層", _options.Layer, minY, Mathf.Max(minY, maxY));
+            _options.DimOtherLayers = EditorGUILayout.Toggle("他の階層を薄く表示", _options.DimOtherLayers);
         }
+
         if (EditorGUI.EndChangeCheck())
             SceneView.RepaintAll();
     }
@@ -408,6 +480,7 @@ internal sealed class PathSearchHistoryWindow : EditorWindow
     {
         minY = _trace.Start.y;
         maxY = _trace.Start.y;
+
         for (int i = 0; i < nodes.Count; i++)
         {
             minY = Mathf.Min(minY, nodes[i].Position.y);
@@ -419,8 +492,7 @@ internal sealed class PathSearchHistoryWindow : EditorWindow
     {
         if (!EditorApplication.isPlaying || _brain == null || _trace == null)
             return;
+
         PathSearchTraceDrawer.Draw(_brain, _trace, _visibleCount, _options);
     }
-
-    private static string Format(Vector3Int p) => $"({p.x},{p.y},{p.z})";
 }
