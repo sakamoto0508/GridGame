@@ -3,8 +3,11 @@ using UnityEngine;
 /// <summary>1セルの破壊可能Blockの12辺を描画。子Objectなので落下の表示位置にも追従します。</summary>
 public class BlockOutlineView : MonoBehaviour
 {
-    // 12辺を1本の連続線で通る経路。一部の辺は同じ位置を折り返します。
-    private static readonly int[] EdgePath = { 0, 1, 3, 2, 0, 4, 5, 1, 5, 7, 3, 7, 6, 2, 6, 4 };
+    private const string OutlineShaderName = "BoundaryOutline";
+
+    [Tooltip("枠線を置く位置（セル幅に対する中心からの距離）。0.5より少し大きくし、面とのちらつきを防ぎます。")]
+    [SerializeField] private float _outlineHalfSizeInCells = 0.505f;
+
     private LineRenderer _line;
     private Material _material;
     private BlockSettings _settings;
@@ -13,34 +16,38 @@ public class BlockOutlineView : MonoBehaviour
     public void Init(GridManager grid, BlockSettings settings)
     {
         _settings = settings;
-        _cellSize = Vector3.Distance(grid.GetWorldPosition(Vector3Int.zero), grid.GetWorldPosition(Vector3Int.right));
+        _cellSize = grid.CellSize;
+
         if (_line == null)
         {
-            Shader shader = Resources.Load<Shader>("BoundaryOutline");
+            Shader shader = Resources.Load<Shader>(OutlineShaderName);
             if (shader == null)
             {
                 Debug.LogWarning("BoundaryOutline ShaderがないためBlockの枠線を生成できません。", this);
                 return;
             }
+
             _material = new Material(shader);
+
             GameObject child = new GameObject("Block Outline");
             child.transform.SetParent(transform, false);
+
             _line = child.AddComponent<LineRenderer>();
             _line.sharedMaterial = _material;
             _line.useWorldSpace = false;
             _line.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             _line.receiveShadows = false;
-            _line.positionCount = EdgePath.Length;
+            _line.positionCount = CubeCorner.EdgePath.Length;
         }
-        // セル表面のわずか外側へ配置し、面とのちらつきを軽減します。
-        float half = _cellSize * 0.505f;
-        for (int i = 0; i < EdgePath.Length; i++)
+
+        float half = _cellSize * _outlineHalfSizeInCells;
+
+        for (int i = 0; i < CubeCorner.EdgePath.Length; i++)
         {
-            int corner = EdgePath[i];
-            Vector3 offset = new Vector3((corner & 1) == 0 ? -half : half,
-                (corner & 2) == 0 ? -half : half, (corner & 4) == 0 ? -half : half);
+            Vector3 offset = CubeCorner.Sign(CubeCorner.EdgePath[i]) * half;
             _line.SetPosition(i, transform.InverseTransformVector(offset));
         }
+
         Refresh();
     }
 
@@ -48,7 +55,9 @@ public class BlockOutlineView : MonoBehaviour
 
     private void Refresh()
     {
-        if (_line == null || _settings == null) return;
+        if (_line == null || _settings == null)
+            return;
+
         _line.enabled = _settings.ShowOutline;
         _line.widthMultiplier = _cellSize * _settings.OutlineWidthInCells;
         _material.color = _settings.OutlineColor;
@@ -57,12 +66,15 @@ public class BlockOutlineView : MonoBehaviour
     private void OnDisable()
     {
         // プール内では描画しない。再貸出後のInitで再設定します。
-        if (_line != null) _line.enabled = false;
+        if (_line != null)
+            _line.enabled = false;
+
         _settings = null;
     }
 
     private void OnDestroy()
     {
-        if (_material != null) Destroy(_material);
+        if (_material != null)
+            Destroy(_material);
     }
 }

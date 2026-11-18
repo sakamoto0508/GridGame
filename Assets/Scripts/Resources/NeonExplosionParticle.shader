@@ -17,8 +17,18 @@ Shader "NEON DETONATOR/Effects/Explosion Additive"
             CBUFFER_START(UnityPerMaterial)
                 float4 _TintColor;
             CBUFFER_END
-            struct Attributes { float4 positionOS : POSITION; float4 color : COLOR; };
-            struct Varyings { float4 positionCS : SV_POSITION; float4 color : COLOR; };
+            struct Attributes
+            {
+                float4 positionOS : POSITION;
+                float4 color : COLOR;
+            };
+
+            struct Varyings
+            {
+                float4 positionCS : SV_POSITION;
+                float4 color : COLOR;
+            };
+
             Varyings vert(Attributes input)
             {
                 Varyings output;
@@ -26,7 +36,10 @@ Shader "NEON DETONATOR/Effects/Explosion Additive"
                 output.color = input.color * _TintColor;
                 return output;
             }
-            half4 frag(Varyings input) : SV_Target { return input.color; }
+            half4 frag(Varyings input) : SV_Target
+            {
+                return input.color;
+            }
             ENDHLSL
         }
     }

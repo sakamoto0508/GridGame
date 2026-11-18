@@ -11,10 +11,14 @@ public class BoundaryViewSettings : ScriptableObject
     [SerializeField, Min(0.001f)] private float _lineWidthInCells = 0.025f;
     [Tooltip("軸方向の微小な誤差で隣の壁が点滅することを防ぎます。")]
     [SerializeField, Range(0f, 0.1f)] private float _directionThreshold = 0.01f;
+
+    /// <summary>Inspectorの下限値と同じ値です。古いAssetの不正値もここで補正します。</summary>
+    private const float MinLineWidthInCells = 0.001f;
+
     public bool ShowOutline => _showOutline;
     public bool ShowFloorGrid => _showFloorGrid;
     public bool ShowWallGrid => _showWallGrid;
     public Color LineColor => _lineColor;
-    public float LineWidthInCells => Mathf.Max(0.001f, _lineWidthInCells);
+    public float LineWidthInCells => Mathf.Max(MinLineWidthInCells, _lineWidthInCells);
     public float DirectionThreshold => _directionThreshold;
 }

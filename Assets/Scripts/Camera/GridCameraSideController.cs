@@ -10,7 +10,14 @@ using UnityEngine;
 [RequireComponent(typeof(CinemachineCamera))]
 public class GridCameraSideController : MonoBehaviour
 {
+    /// <summary>1辺分の回転角度（度）。フィールドは4辺なので90度ずつ回ります。</summary>
+    private const float DegreesPerSide = 90f;
+
+    /// <summary>1回転の角度（度）。到達後の角度をこの範囲に正規化します。</summary>
+    private const float FullRotationDegrees = 360f;
+
     [SerializeField] private CameraSideSettings _settings;
+
     private CameraSideSettings _runtimeSettings;
     private CinemachineCamera _camera;
     private CinemachineFollow _follow;
@@ -26,7 +33,9 @@ public class GridCameraSideController : MonoBehaviour
 
     public bool Init()
     {
-        if (_initialized) return true;
+        if (_initialized)
+            return true;
+
         _camera = GetComponent<CinemachineCamera>();
         _follow = GetComponent<CinemachineFollow>();
         if (_follow == null || !_follow.enabled)
@@ -39,12 +48,14 @@ public class GridCameraSideController : MonoBehaviour
         _follow.TrackerSettings.BindingMode = BindingMode.WorldSpace;
         _initialOffset = _follow.FollowOffset;
         _initialRotation = transform.rotation;
+
         if (_settings == null)
         {
             // 設定AssetがなくてもSOの既定値で動作します。
             _runtimeSettings = ScriptableObject.CreateInstance<CameraSideSettings>();
             _settings = _runtimeSettings;
         }
+
         _initialized = true;
         return true;
     }
@@ -55,25 +66,36 @@ public class GridCameraSideController : MonoBehaviour
     /// </summary>
     public void HandleInput(Vector2 input)
     {
-        int direction = input.x > 0f ? 1 : input.x < 0f ? -1 : 0;
-        if (direction == _previousInputDirection) return;
+        int direction = input.x > 0f ? 1
+            : input.x < 0f ? -1
+            : 0;
+
+        if (direction == _previousInputDirection)
+            return;
+
         _previousInputDirection = direction;
-        if (direction == 0 || Time.timeScale <= 0f) return;
+
+        if (direction == 0 || Time.timeScale <= 0f)
+            return;
+
         ChangeSide(direction);
     }
 
     private void ChangeSide(int step)
     {
         if (!_initialized || _camera == null || _follow == null ||
-            _camera.Target.TrackingTarget == null) return;
+            _camera.Target.TrackingTarget == null)
+            return;
 
         // 途中入力でも現在の表示角度から開始。到達予定の辺をさらに1つ進めます。
         _startAngle = _currentAngle;
-        _targetAngle -= 90f * step;
+        _targetAngle -= DegreesPerSide * step;
         _elapsed = 0f;
         _transitioning = true;
+
         // 回転要求が受理された時だけ2D再生。追従移動やキーの押しっぱなしでは連続再生しません。
         AudioManager.Play(SoundId.CameraRotate);
+
         if (_settings.TransitionDuration <= 0f)
             UpdateTransition(0f);
     }
@@ -89,8 +111,10 @@ public class GridCameraSideController : MonoBehaviour
         _elapsed += deltaTime;
         float duration = _settings.TransitionDuration;
         float progress = duration <= 0f ? 1f : Mathf.Clamp01(_elapsed / duration);
+
         // 直線で位置を結ぶとPlayerに近づくため、角度を補間して円弧上を移動します。
         _currentAngle = Mathf.Lerp(_startAngle, _targetAngle, Mathf.SmoothStep(0f, 1f, progress));
+
         Quaternion turn = Quaternion.AngleAxis(_currentAngle, Vector3.up);
         _follow.FollowOffset = turn * _initialOffset;
         transform.rotation = turn * _initialRotation;
@@ -99,12 +123,13 @@ public class GridCameraSideController : MonoBehaviour
         if (progress >= 1f)
         {
             _transitioning = false;
-            _currentAngle = _targetAngle = Mathf.Repeat(_targetAngle, 360f);
+            _currentAngle = _targetAngle = Mathf.Repeat(_targetAngle, FullRotationDegrees);
         }
     }
 
     private void OnDestroy()
     {
-        if (_runtimeSettings != null) Destroy(_runtimeSettings);
+        if (_runtimeSettings != null)
+            Destroy(_runtimeSettings);
     }
 }

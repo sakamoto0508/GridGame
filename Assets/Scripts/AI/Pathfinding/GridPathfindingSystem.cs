@@ -28,10 +28,6 @@ public readonly struct GridPathStep
 /// <summary>
 /// Enemyの逃走経路は幅優先探索（BFS）、攻撃位置まではA*、Item取得はDijkstra法で計算します。
 ///
-/// このクラス自身はCharacterを動かしません。GridManagerへ移動可能性を問い合わせ、
-/// GridDangerMapへ爆発時刻を問い合わせたうえで、通過するセルの一覧だけを返します。
-/// 実際にMoveまたはJumpを実行するのは、結果を受け取ったEnemyBrainです。
-///
 /// Escape（BFS）で探索できる行動:
 /// ・同じ高さにある水平4方向への通常移動
 /// ・水平に隣接する1段高いBlock上へのジャンプ
@@ -42,14 +38,19 @@ public readonly struct GridPathStep
 /// ・探索途中でのBlock設置
 /// ・Bomb設置
 ///
-/// 注意:
-/// 通常移動とジャンプでは所要時間が異なりますが、探索順はBFSです。
-/// そのため「通過セル数が少ない経路」は見つけやすい一方、異なる移動コストを含む
-/// 厳密な最短時間経路は保証しません。将来的に時間最短を保証するなら、
-/// Dijkstra法またはA*へ置き換える必要があります。
 /// </summary>
 public static class GridPathfindingSystem
 {
+    /// <summary>A*で展開するノード数の上限。経路がない場合でも探索が長引かないようにします。</summary>
+    private const int MaxAttackExpandedNodes = 5000;
+
+    /// <summary>A*のヒューリスティックで使う1手あたりの最小コスト（秒）。移動時間0でも距離を評価できるようにします。</summary>
+    private const float MinimumMoveCostSeconds = 0.01f;
+
+    /// <summary>爆発時刻に対する安全マージン（秒）。ぎりぎりの到着を危険とみなします。</summary>
+    private const float ExplosionSafetyMargin = 0.05f;
+
+    // 探索ノードと共通データ
     private sealed class AttackNode
     {
         public Vector3Int Position;
@@ -61,8 +62,8 @@ public static class GridPathfindingSystem
         public GridPathStep Step;
     }
 
+    // ===== Item: Dijkstra =====
     /// <summary>
-    /// Itemのセルまでの最短所要時間経路をDijkstra法で探索します（ヒューリスティックなし）。
     /// 歩行・段差ジャンプ・降下だけを使用し、地形を変更しません。
     /// 攻撃/逃走と違い、爆発前に通過できても予測危険セルへは寄り道しない方針です。
     /// </summary>
@@ -72,26 +73,47 @@ public static class GridPathfindingSystem
         out float totalTime, PathSearchTrace trace = null)
     {
         totalTime = float.PositiveInfinity;
-        var empty = new List<GridPathStep>();
+        var emptyPath = new List<GridPathStep>();
         trace?.BeginSearch(start, goal);
-        if (grid == null || danger == null || !grid.Contains(start) || !grid.Contains(goal) ||
+
+        if (grid == null || danger == null ||
+            !grid.Contains(start) || !grid.Contains(goal) ||
             danger.IsDangerous(start) || danger.IsDangerous(goal))
         {
             trace?.CompleteWithoutPath();
-            return empty;
+            return emptyPath;
         }
-        var open = new List<AttackNode> { new AttackNode { Position = start } };
+
+        var open = new List<AttackNode>
+        {
+            new AttackNode { Position = start }
+        };
         var costs = new Dictionary<Vector3Int, float> { [start] = 0f };
+
         while (open.Count > 0)
         {
+            // 累積コストが最小のノードを取り出します（線形探索）。
             int best = 0;
-            for (int i = 1; i < open.Count; i++) if (open[i].Cost < open[best].Cost) best = i;
+            for (int i = 1; i < open.Count; i++)
+            {
+                if (open[i].Cost < open[best].Cost)
+                    best = i;
+            }
+
             AttackNode node = open[best];
             open.RemoveAt(best);
-            if (node.Cost > costs[node.Position]) continue;
+
+            if (node.Cost > costs[node.Position])
+                continue;
+
             // 古いコストのまま残った重複エントリは上で読み飛ばすため、ここからが実際の展開です。
-            trace?.RecordExpanded(node.Position, node.Parent?.Position, node.Cost, 0f,
+            trace?.RecordExpanded(
+                node.Position,
+                node.Parent?.Position,
+                node.Cost,
+                0f,
                 node.Parent != null ? node.Step.Action : (GridPathActionType?)null);
+
             if (node.Position == goal)
             {
                 totalTime = node.Cost;
@@ -99,70 +121,113 @@ public static class GridPathfindingSystem
                 trace?.CompleteWithSteps(itemPath, node.Cost);
                 return itemPath;
             }
-            foreach (Vector3Int direction in HorizontalDirections)
+
+            foreach (Vector3Int direction in GridUtility.HorizontalDirections)
             {
                 TryAdd(new GridPathStep(node.Position + direction, direction, GridPathActionType.Move));
-                TryAdd(new GridPathStep(node.Position + direction + Vector3Int.up, direction, GridPathActionType.JumpUp));
-                if (GridGravitySystem.TryGetStepAndFallDestination(grid, node.Position, direction, out _, out Vector3Int landing))
+
+                TryAdd(new GridPathStep(
+                    node.Position + direction + Vector3Int.up,
+                    direction,
+                    GridPathActionType.JumpUp));
+
+                if (GridGravitySystem.TryGetStepAndFallDestination(
+                        grid, node.Position, direction, out _, out Vector3Int landing))
+                {
                     TryAdd(new GridPathStep(landing, direction, GridPathActionType.MoveAndFall));
+                }
             }
 
             void TryAdd(GridPathStep step)
             {
                 if (!IsSafeItemStep(grid, danger, node.Position, step, moveDuration, jumpDuration,
-                        fallDuration, interval, node.Cost, out float duration)) return;
+                        fallDuration, interval, node.Cost, out float duration))
+                    return;
+
                 float cost = node.Cost + duration;
-                if (costs.TryGetValue(step.Position, out float old) && old <= cost) return;
+                if (costs.TryGetValue(step.Position, out float old) && old <= cost)
+                    return;
+
                 costs[step.Position] = cost;
-                open.Add(new AttackNode { Position = step.Position, Cost = cost, Parent = node, Step = step });
+                open.Add(new AttackNode
+                {
+                    Position = step.Position,
+                    Cost = cost,
+                    Parent = node,
+                    Step = step
+                });
             }
         }
+
         trace?.CompleteWithoutPath();
-        return empty;
+        return emptyPath;
     }
 
     /// <summary>保持した取得経路の再検証にも同じ判定を使い、探索と実行の条件を揃えます。</summary>
-    public static bool IsSafeItemStep(GridManager grid, GridDangerMap danger, Vector3Int from,
-        GridPathStep step, float moveDuration, float jumpDuration, float fallDuration,
-        float interval, float elapsed, out float duration)
+    public static bool IsSafeItemStep(
+        GridManager grid,
+        GridDangerMap danger,
+        Vector3Int from,
+        GridPathStep step,
+        float moveDuration,
+        float jumpDuration,
+        float fallDuration,
+        float interval,
+        float elapsed,
+        out float duration)
     {
         duration = Mathf.Max(moveDuration, interval);
-        if (danger.IsDangerous(from) || danger.IsDangerous(step.Position)) return false;
+
+        if (danger.IsDangerous(from) || danger.IsDangerous(step.Position))
+            return false;
+
         Vector3Int direction = step.Direction;
-        if (direction.y != 0 || Mathf.Abs(direction.x) + Mathf.Abs(direction.z) != 1) return false;
+        if (!GridUtility.IsHorizontalUnit(direction))
+            return false;
+
         switch (step.Action)
         {
             case GridPathActionType.Move:
-                if (step.Position != from + direction || !CanStandAt(grid, step.Position)) return false;
+                if (step.Position != from + direction || !CanStandAt(grid, step.Position))
+                    return false;
                 break;
+
             case GridPathActionType.JumpUp:
                 duration = Mathf.Max(jumpDuration, interval);
-                if (!grid.CanJumpUp(from, direction, out Vector3Int up) || up != step.Position ||
-                    !grid.CanCharacterEnter(up) || !grid.CanCharacterEnter(from + Vector3Int.up) ||
-                    danger.IsDangerous(from + Vector3Int.up)) return false;
+
+                // 着地点が一致し、着地点と真上（跳躍中に通るセル）が空いていて安全であること
+                if (!grid.CanJumpUp(from, direction, out Vector3Int up) ||
+                    up != step.Position ||
+                    !grid.CanCharacterEnter(up) ||
+                    !grid.CanCharacterEnter(from + Vector3Int.up) ||
+                    danger.IsDangerous(from + Vector3Int.up))
+                    return false;
                 break;
+
             case GridPathActionType.MoveAndFall:
-                if (!GridGravitySystem.TryGetStepAndFallDestination(grid, from, direction,
-                        out Vector3Int edge, out Vector3Int down) || down != step.Position) return false;
+                if (!GridGravitySystem.TryGetStepAndFallDestination(
+                        grid, from, direction, out Vector3Int edge, out Vector3Int down) ||
+                    down != step.Position)
+                    return false;
+
                 duration += fallDuration * (edge.y - down.y);
+
+                // 落下中に通過する列がすべて安全であること
                 for (int y = edge.y; y >= down.y; y--)
-                    if (danger.IsDangerous(new Vector3Int(edge.x, y, edge.z))) return false;
+                {
+                    if (danger.IsDangerous(new Vector3Int(edge.x, y, edge.z)))
+                        return false;
+                }
                 break;
-            default: return false;
+
+            default:
+                return false;
         }
+
         return CanArriveBeforeExplosion(danger, step.Position, elapsed + duration, interval);
     }
 
-    // UnityではYが高さです。この配列には高さを変えないX/Z方向だけを定義します。
-    // 配列の順番は、同じ距離に複数の安全セルがある場合の探索優先順にもなります。
-    private static readonly Vector3Int[] HorizontalDirections =
-    {
-        Vector3Int.right,
-        Vector3Int.left,
-        Vector3Int.forward,
-        Vector3Int.back
-    };
-
+    // ===== Attack: A* =====
     /// <summary>
     /// PlayerへBombの爆風を届かせられるセルまで、A*で行動列を探索します。
     /// 通常移動、既存Blockへのジャンプ、経路中1回までのBlock設置後ジャンプを扱います。
@@ -203,19 +268,26 @@ public static class GridPathfindingSystem
         bestCosts[AttackKey(start, null)] = 0f;
 
         int expandedNodeCount = 0;
-        const int maxExpandedNodes = 5000;
 
-        while (open.Count > 0 && expandedNodeCount < maxExpandedNodes)
+        while (open.Count > 0 && expandedNodeCount < MaxAttackExpandedNodes)
         {
             expandedNodeCount++;
+
+            // 評価値(f = g + h)が最小のノードを取り出します（線形探索）。
             int bestIndex = 0;
             for (int i = 1; i < open.Count; i++)
+            {
                 if (open[i].Score < open[bestIndex].Score)
                     bestIndex = i;
+            }
 
             AttackNode current = open[bestIndex];
             open.RemoveAt(bestIndex);
-            trace?.RecordExpanded(current.Position, current.Parent?.Position, current.Cost,
+
+            trace?.RecordExpanded(
+                current.Position,
+                current.Parent?.Position,
+                current.Cost,
                 current.Score - current.Cost,
                 current.Parent != null ? current.Step.Action : (GridPathActionType?)null,
                 current.VirtualBlock);
@@ -225,17 +297,17 @@ public static class GridPathfindingSystem
             if (current.Position != start &&
                 (!excludedGoal.HasValue || current.Position != excludedGoal.Value) &&
                 !dangerMap.IsDangerous(current.Position) &&
-                ManhattanDistance(current.Position, playerPosition) <= bombDistance &&
-                CanExplosionReach(gridManager, current.Position, playerPosition, explosionPower))
+                GridUtility.ManhattanDistance(current.Position, playerPosition) <= bombDistance &&
+                ExplosionSystem.CanReach(gridManager, current.Position, playerPosition, explosionPower))
             {
                 List<GridPathStep> attackPath = BuildAttackPath(current);
                 trace?.CompleteWithSteps(attackPath, current.Cost);
                 return attackPath;
             }
 
-            for (int i = 0; i < HorizontalDirections.Length; i++)
+            for (int i = 0; i < GridUtility.HorizontalDirections.Length; i++)
             {
-                Vector3Int direction = HorizontalDirections[i];
+                Vector3Int direction = GridUtility.HorizontalDirections[i];
                 Vector3Int sameLevel = current.Position + direction;
                 float moveCost = Mathf.Max(moveDuration, actionInterval);
 
@@ -340,17 +412,6 @@ public static class GridPathfindingSystem
         return gridManager.HasBlock(below) || virtualBlock == below;
     }
 
-    private static bool CanExplosionReach(
-        GridManager gridManager, Vector3Int origin, Vector3Int target, int power)
-    {
-        IReadOnlyList<Vector3Int> cells =
-            ExplosionSystem.CalculateAffectedCells(gridManager, origin, power);
-        for (int i = 0; i < cells.Count; i++)
-            if (cells[i] == target)
-                return true;
-        return false;
-    }
-
     /// <summary>踏み出しセルから着地セルまでの落下列が爆発前に通過可能か確認します。</summary>
     private static bool CanFallBeforeExplosion(
         GridDangerMap dangerMap,
@@ -365,57 +426,39 @@ public static class GridPathfindingSystem
             if (!CanArriveBeforeExplosion(dangerMap, position, arrivalTime, actionInterval))
                 return false;
         }
+
         return true;
     }
 
+    /// <summary>A*のヒューリスティック。目標までのマンハッタン距離 × 1手の最小コストです。</summary>
     private static float AttackHeuristic(
         Vector3Int position, Vector3Int target, float moveDuration)
-    {
-        Vector3Int difference = position - target;
-        int distance = Mathf.Abs(difference.x) + Mathf.Abs(difference.y) +
-                       Mathf.Abs(difference.z);
-        return distance * Mathf.Max(0.01f, moveDuration);
-    }
+        => GridUtility.ManhattanDistance(position, target) * Mathf.Max(MinimumMoveCostSeconds, moveDuration);
 
-    private static int ManhattanDistance(Vector3Int from, Vector3Int to)
-    {
-        Vector3Int difference = from - to;
-        return Mathf.Abs(difference.x) + Mathf.Abs(difference.y) +
-               Mathf.Abs(difference.z);
-    }
-
+    /// <summary>「位置＋仮想Blockの有無・位置」で探索状態を区別するためのキーです。</summary>
     private static string AttackKey(Vector3Int position, Vector3Int? virtualBlock)
         => $"{position.x},{position.y},{position.z}|" +
            (virtualBlock.HasValue ? virtualBlock.Value.ToString() : "none");
 
+    /// <summary>ゴールから親をたどって、実行順の行動列を作ります（開始ノードは含みません）。</summary>
     private static List<GridPathStep> BuildAttackPath(AttackNode goal)
     {
         List<GridPathStep> path = new List<GridPathStep>();
         AttackNode current = goal;
+
         while (current.Parent != null)
         {
             path.Add(current.Step);
             current = current.Parent;
         }
+
         path.Reverse();
         return path;
     }
 
+    // ===== Escape: BFS =====
     /// <summary>
     /// startから到達できる「爆風予定に一度も含まれない最寄りセル」を探します。
-    ///
-    /// 戻り値の例:
-    /// start=(1,1,1)、安全セル=(3,1,1)の場合
-    /// [(1,1,1), (2,1,1), (3,1,1)]
-    ///
-    /// 戻り値にはstartを含みます。EnemyBrainは通常、index 1を次の移動先として使います。
-    /// 安全セルへ到達できない場合、引数が不正な場合は空のListを返します。
-    ///
-    /// moveDuration        : 通常移動1回の表示・行動時間
-    /// jumpDuration        : 1段ジャンプ1回の時間
-    /// actionInterval      : Enemyが次の判断を行うまでの間隔
-    /// fallDurationPerCell : 飛び降り時の1段あたりの落下時間
-    ///
     /// 飛び降りを含む経路では、着地セルのyが1つ前のセルより低くなります。
     /// </summary>
     public static List<Vector3Int> FindPathToNearestSafeCell(
@@ -428,55 +471,35 @@ public static class GridPathfindingSystem
         float fallDurationPerCell = 0f,
         PathSearchTrace trace = null)
     {
-        // 失敗時にnullを返すと呼び出し側でnull判定が必要になるため、空Listで統一します。
         List<Vector3Int> emptyPath = new List<Vector3Int>();
         trace?.BeginSearch(start, null);
 
-        // 探索に必要な情報がなければ、盤面へアクセスせず終了します。
         if (gridManager == null || dangerMap == null || !gridManager.Contains(start))
         {
             trace?.CompleteWithoutPath();
             return emptyPath;
         }
 
-        // 探索待ちのセル:
-        // これから隣接セルを調べる「探索待ちセル」のFIFOキューです。
-        // FIFOなので、startから1手、2手、3手の順に近いセルから展開されます。
         Queue<Vector3Int> open = new Queue<Vector3Int>();
 
-        // 訪問済みのセル:
-        // すでに発見したセルです。同じセルを何度もキューへ入れて無限ループすることを防ぎます。
         HashSet<Vector3Int> visited = new HashSet<Vector3Int>();
 
-        // 経路を逆にたどるための直前セル:
-        // 「そのセルへどのセルから来たか」を記録します。
-        // ゴール発見後、goalからstartまで逆向きにたどって経路を復元するために使います。
-        Dictionary<Vector3Int, Vector3Int> previous =
-            new Dictionary<Vector3Int, Vector3Int>();
+        Dictionary<Vector3Int, Vector3Int> previous = new Dictionary<Vector3Int, Vector3Int>();
 
-        // 各セルへの到着予想時刻:
-        // startから各セルへ到着する予想時刻（探索開始からの経過秒）です。
-        // GridDangerMapの爆発時刻と比較し、到着前後に爆発するセルを除外します。
         Dictionary<Vector3Int, float> arrivalTimes = new Dictionary<Vector3Int, float>();
 
-        // 探索開始セルを最初の探索待ちセルとして登録します。
         open.Enqueue(start);
         visited.Add(start);
         arrivalTimes[start] = 0f;
 
-        // 調べるセルがなくなるか、安全セルが見つかるまで探索を続けます。
         while (open.Count > 0)
         {
-            // 最も早くキューへ追加されたセルを1つ取り出します。
             Vector3Int current = open.Dequeue();
 
-            // デバッグ記録（traceがnullなら何もしません）。取り出した時点を「展開」とします。
             trace?.RecordExpanded(current,
                 current == start ? (Vector3Int?)null : previous[current],
                 arrivalTimes[current], 0f);
 
-            // start自身はEnemyが現在立っている危険セルなので、ゴールにはしません。
-            // IsDangerous=falseは「どのBombの爆風予定にも含まれない」ことを意味します。
             if (current != start && !dangerMap.IsDangerous(current))
             {
                 List<Vector3Int> safePath = BuildPath(previous, start, current);
@@ -484,40 +507,27 @@ public static class GridPathfindingSystem
                 return safePath;
             }
 
-            // currentから水平4方向へ進めるか、1方向ずつ調べます。
-            for (int i = 0; i < HorizontalDirections.Length; i++)
+            for (int i = 0; i < GridUtility.HorizontalDirections.Length; i++)
             {
-                Vector3Int direction = HorizontalDirections[i];
+                Vector3Int direction = GridUtility.HorizontalDirections[i];
 
-                // 通常移動した場合の、同じ高さにある隣接セルです。
                 Vector3Int next = current + direction;
 
-                // currentへ到着するまでに必要だった累積時間です。
                 float currentArrival = arrivalTimes[current];
 
-                // AIは移動が早く完了しても、次の思考タイミングまでは新しい行動をしません。
-                // そのため1手の所要時間は、移動時間と行動間隔の大きい方として扱います。
                 float moveArrival = currentArrival + Mathf.Max(moveDuration, actionInterval);
 
-                // 1. nextへCharacterが入れる
-                // 2. nextの直下にBlock（足場）がある
-                // 3. 到着・滞在中に爆発しない
-                // 以上を満たす場合だけ探索候補へ追加します。
                 if (CanStandAt(gridManager, next) && CanArriveBeforeExplosion(
                         dangerMap, next, moveArrival, actionInterval))
                 {
                     TryEnqueue(next, current, moveArrival, visited, previous, arrivalTimes, open);
                 }
 
-                // 通常移動とは別に、同じdirectionへ1段上るジャンプも調べます。
-                // CanJumpUpは、方向先にBlockがあり、そのBlock上が空いているかを判定します。
                 if (gridManager.CanJumpUp(current, direction, out Vector3Int jumpLanding) &&
                     gridManager.CanCharacterEnter(jumpLanding))
                 {
-                    // ジャンプについても、ジャンプ時間とAI行動間隔の大きい方を1手の時間にします。
                     float jumpArrival = currentArrival + Mathf.Max(jumpDuration, actionInterval);
 
-                    // ジャンプ先へ到着し、次の行動を待つ間に爆発しない場合だけ追加します。
                     if (CanArriveBeforeExplosion(
                             dangerMap, jumpLanding, jumpArrival, actionInterval))
                     {
@@ -526,9 +536,6 @@ public static class GridPathfindingSystem
                     }
                 }
 
-                // 方向先に足場がない場合は、下の最初の足場まで飛び降りる逃走も候補にします。
-                // 所要時間はA*と同じく「1歩＋落下段数分の落下時間」とし、踏み出しセルから
-                // 着地セルまでの落下列すべてが通過時点で爆発前である場合だけ追加します。
                 if (GridGravitySystem.TryGetStepAndFallDestination(
                         gridManager, current, direction,
                         out Vector3Int fallEdge, out Vector3Int fallLanding))
@@ -547,7 +554,6 @@ public static class GridPathfindingSystem
             }
         }
 
-        // キューが空になった場合、現在の移動ルールでは安全セルへ到達できません。
         trace?.CompleteWithoutPath();
         return emptyPath;
     }
@@ -558,14 +564,11 @@ public static class GridPathfindingSystem
     /// </summary>
     private static bool CanStandAt(GridManager gridManager, Vector3Int position)
     {
-        // Block、Bomb、別Character、予約があるセルには通常移動できません。
         if (!gridManager.CanCharacterEnter(position))
             return false;
 
-        // Characterが立つセルの1段下を足場セルとして調べます。
         Vector3Int below = position + Vector3Int.down;
 
-        // 外殻床(Y=-1)も足場として認識。立つセル自体は上で内部範囲を検証済みです。
         return gridManager.HasBlock(below);
     }
 
@@ -582,18 +585,13 @@ public static class GridPathfindingSystem
         Dictionary<Vector3Int, float> arrivalTimes,
         Queue<Vector3Int> open)
     {
-        // HashSet.Addは新規追加できた場合だけtrueを返します。
-        // falseなら別経路ですでに発見済みなので、重複して探索しません。
         if (!visited.Add(next))
             return;
 
-        // nextへはcurrentから来たことを保存します。
         previous[next] = current;
 
-        // nextへ到着するまでの累積時間を保存します。
         arrivalTimes[next] = arrivalTime;
 
-        // 後でnextの隣接セルを調べるため、探索待ちキューへ追加します。
         open.Enqueue(next);
     }
 
@@ -604,15 +602,10 @@ public static class GridPathfindingSystem
     private static bool CanArriveBeforeExplosion(
         GridDangerMap dangerMap, Vector3Int position, float arrivalTime, float actionInterval)
     {
-        // 危険時刻が存在しないなら、どのBombの爆風にも含まれていません。
         if (!dangerMap.TryGetDangerTime(position, out float dangerTime))
             return true;
 
-        // 計算誤差やフレーム時間のずれで爆発と同時到着にならないよう、少し余裕を持たせます。
-        const float safetyMargin = 0.05f;
-
-        // 到着時刻だけでなく、次の行動を開始できるまでの待ち時間も含めて比較します。
-        return arrivalTime + actionInterval + safetyMargin < dangerTime;
+        return arrivalTime + actionInterval + ExplosionSafetyMargin < dangerTime;
     }
 
     /// <summary>
@@ -623,18 +616,15 @@ public static class GridPathfindingSystem
         Vector3Int start,
         Vector3Int goal)
     {
-        // 最初はゴールだけを入れます。この段階では逆順の経路です。
         List<Vector3Int> path = new List<Vector3Int> { goal };
         Vector3Int current = goal;
 
-        // goal → 親 → 親の親 → startという順番でたどります。
         while (current != start)
         {
             current = previous[current];
             path.Add(current);
         }
 
-        // 現在はgoalからstartの逆順なので、startからgoalの実行順へ反転します。
         path.Reverse();
         return path;
     }

@@ -15,28 +15,33 @@ public enum CharacterMoveState
 /// </summary>
 public class MovementComponent : MonoBehaviour
 {
+    /// <summary>
+    /// 放物線 4t(1-t) の係数。進行率t=0.5のとき加算量がちょうどJumpArcHeightになります。
+    /// </summary>
+    private const float JumpArcCoefficient = 4f;
+
+    [SerializeField] private CharacterMovementSettings _settings;
+
+    private GridManager _gridManager;
+    private CharacterBase _character;
+    private Vector3Int _currentGridPosition;
+    private Vector3Int _facingDirection = Vector3Int.forward;
+    private CharacterMoveState _state = CharacterMoveState.Grounded;
+    private bool _isInitialized;
+
     /// <summary>論理グリッド座標が変化したときだけ通知します。</summary>
     public event System.Action GridPositionChanged;
 
-    private void SetGridPosition(Vector3Int position)
-    {
-        if (_currentGridPosition == position) return;
-        _currentGridPosition = position;
-        GridPositionChanged?.Invoke();
-    }
-    /// <summary>現在占有している論理グリッド座標です。</summary>
+    /// <summary>
+    /// 現在占有している論理グリッド座標です。移動要求の受理時点で移動先に切り替わるため、
+    /// 表示位置（transform）より先行します。
+    /// </summary>
     public Vector3Int CurrentGridPosition => _currentGridPosition;
 
     /// <summary>最後に入力された水平4方向です。</summary>
     public Vector3Int FacingDirection => _facingDirection;
 
-    /// <summary>現在の移動状態です。</summary>
     public CharacterMoveState State => _state;
-
-    /// <summary>ジャンプまたは落下中ならtrueです。</summary>
-    public bool IsAirborne =>
-        _state == CharacterMoveState.Jumping ||
-        _state == CharacterMoveState.Falling;
 
     /// <summary>新しい移動要求を受け付けられない状態ならtrueです。</summary>
     public bool IsBusy => _state != CharacterMoveState.Grounded;
@@ -48,26 +53,29 @@ public class MovementComponent : MonoBehaviour
     public float JumpDuration => _settings != null
         ? _settings.JumpUpDuration + _settings.AirTime
         : 0f;
+
+    /// <summary>AIが経路の到着時間を予測するための、1セルあたりの落下時間です。</summary>
     public float FallDurationPerCell => _settings != null ? _settings.FallDuration : 0f;
 
     /// <summary>移動せずに水平4方向へ向きを変更します。AIのBlock設置にも使用します。</summary>
     public bool TryFace(Vector3Int direction)
     {
-        if (IsBusy || !IsHorizontalDirection(direction))
+        if (IsBusy || !GridUtility.IsHorizontalUnit(direction))
             return false;
 
         _facingDirection = direction;
         return true;
     }
 
-    [SerializeField] private CharacterMovementSettings _settings;
+    /// <summary>論理座標を更新し、変化したときだけ通知します。</summary>
+    private void SetGridPosition(Vector3Int position)
+    {
+        if (_currentGridPosition == position)
+            return;
 
-    private GridManager _gridManager;
-    private CharacterBase _character;
-    private Vector3Int _currentGridPosition;
-    private Vector3Int _facingDirection = Vector3Int.forward;
-    private CharacterMoveState _state = CharacterMoveState.Grounded;
-    private bool _isInitialized;
+        _currentGridPosition = position;
+        GridPositionChanged?.Invoke();
+    }
 
     private void Awake()
     {
@@ -136,7 +144,7 @@ public class MovementComponent : MonoBehaviour
     /// </summary>
     public bool TryMove(Vector3Int direction)
     {
-        if (IsBusy || !IsHorizontalDirection(direction))
+        if (IsBusy || !GridUtility.IsHorizontalUnit(direction))
             return false;
 
         // 壁に阻まれた場合でも、入力した方向へ向きを更新します。
@@ -157,16 +165,21 @@ public class MovementComponent : MonoBehaviour
     /// <summary>水平へ踏み出した後、その先にある低い足場まで移動と落下を連続実行します。</summary>
     public bool TryMoveAndFall(Vector3Int direction)
     {
-        if (IsBusy || !IsHorizontalDirection(direction))
+        if (IsBusy || !GridUtility.IsHorizontalUnit(direction))
             return false;
 
         _facingDirection = direction;
+
         if (!GridGravitySystem.TryGetStepAndFallDestination(
-                _gridManager, _currentGridPosition, direction,
-                out Vector3Int edgePosition, out Vector3Int landingPosition))
+                _gridManager,
+                _currentGridPosition,
+                direction,
+                out Vector3Int edgePosition,
+                out Vector3Int landingPosition))
             return false;
 
         Vector3Int startPosition = _currentGridPosition;
+
         if (!_gridManager.TryMoveCharacter(startPosition, landingPosition, _character))
             return false;
 
@@ -175,15 +188,19 @@ public class MovementComponent : MonoBehaviour
         return true;
     }
 
+    /// <summary>崖の縁まで水平移動し、そこから着地点まで落下する表示を再生します。</summary>
     private async Awaitable MoveAndFallAwaitable(
         Vector3Int edgePosition, Vector3Int landingPosition)
     {
         _state = CharacterMoveState.Moving;
+
         try
         {
             await MoveToAwaitable(
                 _gridManager.GetWorldPosition(edgePosition), _settings.MoveDuration);
+
             _state = CharacterMoveState.Falling;
+
             int fallDistance = edgePosition.y - landingPosition.y;
             await MoveToAwaitable(
                 _gridManager.GetWorldPosition(landingPosition),
@@ -206,7 +223,7 @@ public class MovementComponent : MonoBehaviour
         if (direction == Vector3Int.zero)
             return TryJumpInPlace();
 
-        if (!IsHorizontalDirection(direction))
+        if (!GridUtility.IsHorizontalUnit(direction))
             return false;
 
         _facingDirection = direction;
@@ -330,8 +347,8 @@ public class MovementComponent : MonoBehaviour
                 float rate = Mathf.Clamp01(elapsed / duration);
                 Vector3 position = Vector3.Lerp(start, destination, rate);
 
-                // 0→1→0と変化する値を加え、直線移動をジャンプ軌道にします。
-                position.y += 4f * rate * (1f - rate) * _settings.JumpArcHeight;
+                // 放物線で直線移動に高さを足します。係数4で、進行率0.5のときに加算量がJumpArcHeightに達します。
+                position.y += JumpArcCoefficient * rate * (1f - rate) * _settings.JumpArcHeight;
                 transform.position = position;
                 await Awaitable.NextFrameAsync();
             }
@@ -432,12 +449,5 @@ public class MovementComponent : MonoBehaviour
             elapsed += Time.deltaTime;
             await Awaitable.NextFrameAsync();
         }
-    }
-
-    /// <summary>値がX/Z平面上の単位4方向かを判定します。</summary>
-    private static bool IsHorizontalDirection(Vector3Int direction)
-    {
-        return direction.y == 0 &&
-               Mathf.Abs(direction.x) + Mathf.Abs(direction.z) == 1;
     }
 }

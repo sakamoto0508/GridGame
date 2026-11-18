@@ -11,8 +11,18 @@ Shader "NEON DETONATOR/City Background"
             #pragma vertex vert
             #pragma fragment frag
             #include "UnityCG.cginc"
-            struct Input { float4 vertex : POSITION; float4 color : COLOR; };
-            struct Output { float4 position : SV_POSITION; float4 color : COLOR; };
+            struct Input
+            {
+                float4 vertex : POSITION;
+                float4 color : COLOR;
+            };
+
+            struct Output
+            {
+                float4 position : SV_POSITION;
+                float4 color : COLOR;
+            };
+
             Output vert(Input v)
             {
                 Output o;
@@ -20,7 +30,11 @@ Shader "NEON DETONATOR/City Background"
                 o.color = v.color;
                 return o;
             }
-            half4 frag(Output i) : SV_Target { return half4(i.color.rgb, 1); }
+
+            half4 frag(Output i) : SV_Target
+            {
+                return half4(i.color.rgb, 1);
+            }
             ENDHLSL
         }
     }

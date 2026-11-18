@@ -8,6 +8,13 @@ using UnityEngine.UI;
 /// </summary>
 public class GameHud : MonoBehaviour
 {
+    /// <summary>数値を2桁ゼロ埋めで表示する書式です。</summary>
+    private const string TwoDigitFormat = "00";
+
+    // Playerが未設定のときに表示するプレースホルダーです。
+    private const string EmptyValueText = "--";
+    private const string EmptyPositionText = "-- / -- / --";
+
     [Header("Game State")]
     [SerializeField] private GridBomberGameState _gameState;
     [SerializeField] private GameHudSettings _settings;
@@ -16,6 +23,7 @@ public class GameHud : MonoBehaviour
     [SerializeField] private TMP_Text _aliveCountText;
     [Tooltip("Sceneに配置したTMP Textを指定してください。UIは自動生成しません。")]
     [SerializeField] private TMP_Text _playerStatusText;
+
     [Header("NEON HUD（任意・Editor配置）")]
     [SerializeField] private TMP_Text _aliveValueText;
     [SerializeField] private TMP_Text _powerValueText;
@@ -45,6 +53,7 @@ public class GameHud : MonoBehaviour
 
     private void Awake()
     {
+        // 以降の処理は_settingsがnullでない前提です。未設定ならここで既定値のSettingsを作ります。
         if (_settings == null)
         {
             Debug.LogWarning("GameHudのSettingsが未設定のため既定値を使用します。", this);
@@ -53,8 +62,10 @@ public class GameHud : MonoBehaviour
         }
 
         PrepareResultCanvasGroup();
+
         if (_playerStatusText == null)
             Debug.LogWarning("GameHudのPlayer Status Textに、SceneのTMP Textを設定してください。", this);
+
         HideResult();
 
         UpdateAliveCount(_gameState != null ? _gameState.AliveCharacterCount : 0);
@@ -68,7 +79,10 @@ public class GameHud : MonoBehaviour
         _playerBombs = player != null ? player.GetComponent<BombComponent>() : null;
         _playerMovement = player != null ? player.GetComponent<MovementComponent>() : null;
         _statusValid = false;
-        if (isActiveAndEnabled) SubscribePlayer();
+
+        if (isActiveAndEnabled)
+            SubscribePlayer();
+
         RefreshPlayerStatus();
     }
 
@@ -76,14 +90,21 @@ public class GameHud : MonoBehaviour
     {
         // BindとOnEnableの両方から呼ばれても二重購読しません。
         UnsubscribePlayer();
-        if (_playerBombs != null) _playerBombs.StatsChanged += RefreshPlayerStatus;
-        if (_playerMovement != null) _playerMovement.GridPositionChanged += RefreshPlayerStatus;
+
+        if (_playerBombs != null)
+            _playerBombs.StatsChanged += RefreshPlayerStatus;
+
+        if (_playerMovement != null)
+            _playerMovement.GridPositionChanged += RefreshPlayerStatus;
     }
 
     private void UnsubscribePlayer()
     {
-        if (_playerBombs != null) _playerBombs.StatsChanged -= RefreshPlayerStatus;
-        if (_playerMovement != null) _playerMovement.GridPositionChanged -= RefreshPlayerStatus;
+        if (_playerBombs != null)
+            _playerBombs.StatsChanged -= RefreshPlayerStatus;
+
+        if (_playerMovement != null)
+            _playerMovement.GridPositionChanged -= RefreshPlayerStatus;
     }
 
     /// <summary>値を比較し、変化したときだけ文字列を更新。死亡後も最後の座標と残存Bomb数を表示します。</summary>
@@ -91,47 +112,77 @@ public class GameHud : MonoBehaviour
     {
         if (_player == null || _playerBombs == null || _playerMovement == null)
         {
-            if (_playerStatusText != null) _playerStatusText.text = string.Empty;
-            SetValue(_powerValueText, "--");
-            SetValue(_limitValueText, "--");
-            SetValue(_placedValueText, "--");
-            SetValue(_positionValueText, "-- / -- / --");
+            if (_playerStatusText != null)
+                _playerStatusText.text = string.Empty;
+
+            SetValue(_powerValueText, EmptyValueText);
+            SetValue(_limitValueText, EmptyValueText);
+            SetValue(_placedValueText, EmptyValueText);
+            SetValue(_positionValueText, EmptyPositionText);
             _statusValid = false;
             return;
         }
+
         int power = _playerBombs.ExplosionPower;
         int limit = _playerBombs.MaxBombCount;
         int placed = _playerBombs.CurrentBombCount;
         Vector3Int position = _playerMovement.CurrentGridPosition;
         string format = _settings.PlayerStatusFormat ?? string.Empty;
-        if (_statusValid && power == _lastPower && limit == _lastLimit && placed == _lastPlaced &&
-            position == _lastPosition && format == _lastStatusFormat) return;
+
+        bool unchanged =
+            _statusValid &&
+            power == _lastPower &&
+            limit == _lastLimit &&
+            placed == _lastPlaced &&
+            position == _lastPosition &&
+            format == _lastStatusFormat;
+        if (unchanged)
+            return;
+
         _lastPower = power;
         _lastLimit = limit;
         _lastPlaced = placed;
         _lastPosition = position;
         _lastStatusFormat = format;
         _statusValid = true;
-        SetValue(_powerValueText, power.ToString("00"));
-        SetValue(_limitValueText, limit.ToString("00"));
-        SetValue(_placedValueText, placed.ToString("00"));
+
+        SetValue(_powerValueText, power.ToString(TwoDigitFormat));
+        SetValue(_limitValueText, limit.ToString(TwoDigitFormat));
+        SetValue(_placedValueText, placed.ToString(TwoDigitFormat));
         SetValue(_positionValueText, $"{position.x:00} / {position.y:00} / {position.z:00}");
-        if (_playerStatusText == null || !_playerStatusText.gameObject.activeSelf) return;
+
+        if (_playerStatusText == null || !_playerStatusText.gameObject.activeSelf)
+            return;
+
         try
         {
-            _playerStatusText.text = string.Format(format, power, limit, placed, position.x, position.y, position.z);
+            _playerStatusText.text = string.Format(
+                format,
+                power,
+                limit,
+                placed,
+                position.x,
+                position.y,
+                position.z);
         }
         catch (System.FormatException)
         {
+            // 書式が壊れていても最低限の情報は表示します（ゲーム内UIは英語表記）。
             Debug.LogWarning("Player Status Formatの書式が不正です。{0}～{5}を使用してください。", this);
-            _playerStatusText.text = $"RANGE: {power}\nBOMB LIMIT: {limit}\nBOMBS PLACED: {placed}\nGRID: {position}";
+            _playerStatusText.text =
+                $"RANGE: {power}\n" +
+                $"BOMB LIMIT: {limit}\n" +
+                $"BOMBS PLACED: {placed}\n" +
+                $"GRID: {position}";
         }
     }
 
     private void OnDestroy()
     {
         UnsubscribePlayer();
-        if (_runtimeSettings != null) Destroy(_runtimeSettings);
+
+        if (_runtimeSettings != null)
+            Destroy(_runtimeSettings);
     }
 
     private void OnEnable()
@@ -139,6 +190,7 @@ public class GameHud : MonoBehaviour
         SubscribePlayer();
         _statusValid = false;
         RefreshPlayerStatus();
+
         if (_gameState != null)
         {
             UpdateAliveCount(_gameState.AliveCharacterCount);
@@ -153,6 +205,7 @@ public class GameHud : MonoBehaviour
 
         if (_restartButton != null)
             _restartButton.onClick.AddListener(RestartGame);
+
         if (_returnToSetupButton != null)
             _returnToSetupButton.onClick.AddListener(ReturnToSetup);
     }
@@ -172,6 +225,7 @@ public class GameHud : MonoBehaviour
 
         if (_restartButton != null)
             _restartButton.onClick.RemoveListener(RestartGame);
+
         if (_returnToSetupButton != null)
             _returnToSetupButton.onClick.RemoveListener(ReturnToSetup);
     }
@@ -179,16 +233,16 @@ public class GameHud : MonoBehaviour
     /// <summary>現在の生存Character数を表示します。</summary>
     private void UpdateAliveCount(int aliveCount)
     {
-        SetValue(_aliveValueText, aliveCount.ToString("00"));
+        SetValue(_aliveValueText, aliveCount.ToString(TwoDigitFormat));
+
         if (_aliveCountText != null)
-            _aliveCountText.text = _settings != null
-                ? string.Format(_settings.AliveFormat, aliveCount)
-                : $"ALIVE: {aliveCount}";
+            _aliveCountText.text = string.Format(_settings.AliveFormat, aliveCount);
     }
 
     private static void SetValue(TMP_Text text, string value)
     {
-        if (text != null && text.text != value) text.text = value;
+        if (text != null && text.text != value)
+            text.text = value;
     }
 
     /// <summary>新しい試合が始まったとき、前回の結果表示を閉じます。</summary>
@@ -202,17 +256,18 @@ public class GameHud : MonoBehaviour
     private void HandleMatchFinished(CharacterBase winner)
     {
         // 勝者の参照が後から消えても結果を維持し、SEはフェード完了まで待ちます。
-        SoundId? resultSound = winner == null ? (SoundId?)null :
-        winner is PlayerCharacter ? SoundId.Win : SoundId.Lose;
+        SoundId? resultSound = winner == null ? (SoundId?)null
+            : winner is PlayerCharacter ? SoundId.Win
+            : SoundId.Lose;
 
         if (_resultText != null)
         {
             if (winner == null)
-                _resultText.text = _settings != null ? _settings.DrawText : "DRAW";
+                _resultText.text = _settings.DrawText;
             else if (winner is PlayerCharacter)
-                _resultText.text = _settings != null ? _settings.WinText : "YOU WIN";
+                _resultText.text = _settings.WinText;
             else
-                _resultText.text = _settings != null ? _settings.LoseText : "YOU LOSE";
+                _resultText.text = _settings.LoseText;
         }
 
         int sequenceVersion = ++_resultSequenceVersion;
@@ -224,8 +279,8 @@ public class GameHud : MonoBehaviour
     {
         float elapsedTime = 0f;
 
-        float resultDelay = _settings != null ? _settings.ResultDelay : 0f;
-        float fadeDuration = _settings != null ? _settings.FadeDuration : 0f;
+        float resultDelay = _settings.ResultDelay;
+        float fadeDuration = _settings.FadeDuration;
 
         while (elapsedTime < resultDelay)
         {
@@ -309,11 +364,15 @@ public class GameHud : MonoBehaviour
     /// <summary>完全表示にして操作を有効化し、勝敗SEを再生します。中断済みなら鳴らしません。</summary>
     private void CompleteResultFade(int sequenceVersion, SoundId? resultSound)
     {
-        if (!CanContinueResultSequence(sequenceVersion) || _resultCanvasGroup == null) return;
+        if (!CanContinueResultSequence(sequenceVersion) || _resultCanvasGroup == null)
+            return;
+
         _resultCanvasGroup.alpha = 1f;
         _resultCanvasGroup.interactable = true;
         _resultCanvasGroup.blocksRaycasts = true;
-        if (resultSound.HasValue) AudioManager.Play(resultSound.Value);
+
+        if (resultSound.HasValue)
+            AudioManager.Play(resultSound.Value);
     }
 
     /// <summary>現在開いているSceneを読み込み直して試合を最初から開始します。</summary>
@@ -326,8 +385,12 @@ public class GameHud : MonoBehaviour
 
     private void Reload(bool autoStart)
     {
-        if (_gameMode == null) _gameMode = FindFirstObjectByType<GridBomberGameMode>();
-        if (_gameMode != null) _gameMode.ReloadMatch(autoStart);
-        else Debug.LogWarning("再読込にはGameModeを指定してください。", this);
+        if (_gameMode == null)
+            _gameMode = FindFirstObjectByType<GridBomberGameMode>();
+
+        if (_gameMode != null)
+            _gameMode.ReloadMatch(autoStart);
+        else
+            Debug.LogWarning("再読込にはGameModeを指定してください。", this);
     }
 }

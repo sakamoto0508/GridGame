@@ -11,9 +11,12 @@ public class BlockSettings : ScriptableObject
     [SerializeField] private Color _outlineColor = new Color(0.15f, 0.2f, 0.25f, 1f);
     [SerializeField, Min(0.001f)] private float _outlineWidthInCells = 0.025f;
 
+    /// <summary>Inspectorの下限値と同じ値です。古いAssetの不正値もここで補正します。</summary>
+    private const float MinOutlineWidthInCells = 0.001f;
+
     public BlockType Type => _type;
     public float FallDuration => _fallDuration;
     public bool ShowOutline => _showOutline;
     public Color OutlineColor => _outlineColor;
-    public float OutlineWidthInCells => Mathf.Max(0.001f, _outlineWidthInCells);
+    public float OutlineWidthInCells => Mathf.Max(MinOutlineWidthInCells, _outlineWidthInCells);
 }

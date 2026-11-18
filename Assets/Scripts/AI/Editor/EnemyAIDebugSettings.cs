@@ -28,6 +28,7 @@ internal static class EnemyAIDebugSettings
         }
     }
 
+    // 以下はVisualizerがない場合に例外になるため、必ずEnabledを確認してから参照してください。
     public static bool DangerCells => Current.ShowDangerCells;
     public static bool DangerTimers => Current.ShowDangerTimers;
     public static bool EscapePath => Current.ShowEscapePath;

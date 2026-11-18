@@ -13,11 +13,16 @@ public class EndPhaseSettings : ScriptableObject
     [SerializeField] private Block _blockPrefab;
     [SerializeField] private Color _warningColor = new Color(1f, 0.15f, 0.05f, 1f);
     [SerializeField, Min(0.001f)] private float _lineWidthInCells = 0.06f;
+
+    // Inspectorの下限値と同じ値です。古いAssetの不正値もここで補正します。
+    private const float MinIntervalSeconds = 0.1f;
+    private const float MinLineWidthInCells = 0.001f;
+
     public bool Enabled => _enabled;
     public float StartAfterSeconds => Mathf.Max(0f, _startAfterSeconds);
-    public float WarningSeconds => Mathf.Max(0.1f, _warningSeconds);
-    public float DropInterval => Mathf.Max(0.1f, _dropInterval);
+    public float WarningSeconds => Mathf.Max(MinIntervalSeconds, _warningSeconds);
+    public float DropInterval => Mathf.Max(MinIntervalSeconds, _dropInterval);
     public Block BlockPrefab => _blockPrefab;
     public Color WarningColor => _warningColor;
-    public float LineWidthInCells => Mathf.Max(0.001f, _lineWidthInCells);
+    public float LineWidthInCells => Mathf.Max(MinLineWidthInCells, _lineWidthInCells);
 }

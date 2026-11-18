@@ -15,62 +15,54 @@ public class GridCell
     public Block Block { get; private set; }
     public Bomb Bomb { get; private set; }
     public Item Item { get; private set; }
-    /// <summary>ItemはCharacter・Bombと同居可能ですが、Block・予約セルには置けません。</summary>
+    public CharacterBase Character { get; private set; }
+
+    /// <summary>
+    /// Characterが入れるセルか（落下先・ジャンプ着地点の判定用）。
+    /// BombはCharacterと同居できるため、ここではBombを妨げとして扱いません。
+    /// 歩いて入る場合はGridManager.CanCharacterEnter（Bombも不可）を使います。
+    /// </summary>
+    public bool IsWalkable => Block == null && Character == null;
+
+    /// <summary>ItemはCharacter・Bombと同居可能ですが、Blockのあるセルには置けません。</summary>
     public bool TrySetItem(Item item)
     {
-        if (item == null || Item != null || Block != null || IsReserved) return false;
+        if (item == null || Item != null || Block != null)
+            return false;
+
         Item = item;
         return true;
     }
 
     public bool RemoveItem(Item item)
     {
-        if (Item != item) return false;
+        if (Item != item)
+            return false;
+
         Item = null;
         return true;
     }
-    public CharacterBase Character { get; private set; }
 
-    /// <summary>
-    /// このセルが予約されているかどうかを示すフラグ。予約されている場合、キャラクターはこのセルに移動できません。
-    /// </summary>
-    public bool IsReserved { get; private set; }
-
-    public bool IsWalkable => Block == null && Character == null && !IsReserved;
-
-    /// <summary>
-    /// 指定されたキャラクターをこのセルに設定しようとします。
-    /// </summary>
-    /// <param name="character"></param>
-    /// <returns></returns>
     public bool TrySetCharacter(CharacterBase character)
     {
-        if (character == null || Character != null || IsReserved)
+        if (character == null || Character != null)
             return false;
 
         Character = character;
         return true;
     }
 
-    /// <summary>
-    /// 指定されたブロックをこのセルに設定しようとします。
-    /// </summary>
-    /// <param name="block"></param>
-    /// <returns></returns>
     public bool TrySetBlock(Block block)
     {
-        // 落下BlockはCharacterと同居して押し潰せるが、Bomb・予約セルとは重複できない。
-        if (block == null || Block != null || Bomb != null || IsReserved)
+        // 落下BlockはCharacterと同居して押し潰せるが、Bombとは重複できない。
+        if (block == null || Block != null || Bomb != null)
             return false;
+
         Block = block;
         return true;
     }
 
-    /// <summary>
-    /// 指定されたキャラクターをこのセルから削除しようとします。
-    /// </summary>
-    /// <param name="character"></param>
-    /// <returns></returns>
+    /// <summary>このセルにいるCharacterと一致した場合だけ削除します。</summary>
     public bool RemoveCharacter(CharacterBase character)
     {
         if (Character != character)
@@ -80,51 +72,33 @@ public class GridCell
         return true;
     }
 
-    /// <summary>
-    /// 指定されたブロックをこのセルから削除しようとします。
-    /// </summary>
-    /// <param name="block"></param>
-    /// <returns></returns>
+    /// <summary>このセルのBlockと一致した場合だけ削除します。</summary>
     public bool RemoveBlock(Block block)
     {
         if (Block != block)
             return false;
+
         Block = null;
         return true;
     }
 
-    /// <summary>
-    /// 指定された爆弾をこのセルに設定しようとします。
-    /// </summary>
-    /// <param name="bomb"></param>
-    /// <returns></returns>
     public bool TrySetBomb(Bomb bomb)
     {
-        // Characterとは同居可能だが、Block・既存Bomb・予約セルとは重複させない。
-        if (bomb == null || Block != null || Bomb != null || IsReserved)
+        // Characterとは同居可能だが、Block・既存Bombとは重複させない。
+        if (bomb == null || Block != null || Bomb != null)
             return false;
+
         Bomb = bomb;
         return true;
     }
 
-    /// <summary>
-    /// 指定された爆弾をこのセルから削除しようとします。
-    /// </summary>
-    /// <param name="bomb"></param>
-    /// <returns></returns>
+    /// <summary>このセルのBombと一致した場合だけ削除します。</summary>
     public bool RemoveBomb(Bomb bomb)
     {
         if (Bomb != bomb)
             return false;
+
         Bomb = null;
         return true;
-    }
-
-    /// <summary>
-    /// このセルを予約します。予約済みのセルは他のオブジェクトが使用できなくなる。
-    /// </summary>
-    public void Reserve()
-    {
-        IsReserved = true;
     }
 }

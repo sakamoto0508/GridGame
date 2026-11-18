@@ -9,6 +9,9 @@ using UnityEngine;
 /// </summary>
 public partial class EnemyBrain
 {
+    /// <summary>逃走経路なしのログに出す展開セルの最大数です（ログが長くなりすぎないように制限）。</summary>
+    private const int DebugMaxLoggedCells = 12;
+
     /// <summary>
     /// 探索履歴の収集が有効な場合だけTraceを作成して履歴へ追加し、探索関数へ渡します。
     /// 無効時はnullを返すため、探索関数は記録処理を一切行いません。
@@ -53,20 +56,26 @@ public partial class EnemyBrain
         string detail = "";
         if (escapeTrace != null)
         {
-            detail = $" (escape BFS expanded {escapeTrace.ExpandedCount}";
+            detail = $"（逃走BFSの展開数={escapeTrace.ExpandedCount}";
+
             if (decision == BombAttemptResult.NoEscapeRoute)
             {
                 var cells = new System.Text.StringBuilder();
-                int shown = Mathf.Min(escapeTrace.ExpandedNodes.Count, 12);
+                int shown = Mathf.Min(escapeTrace.ExpandedNodes.Count, DebugMaxLoggedCells);
+
                 for (int i = 0; i < shown; i++)
                     cells.Append(escapeTrace.ExpandedNodes[i].Position).Append(' ');
-                detail += $": {cells}";
+
+                detail += $"、展開セル={cells}";
             }
-            detail += ")";
+
+            detail += "）";
         }
 
         Vector3Int player = _playerMovement != null ? _playerMovement.CurrentGridPosition : default;
-        Debug.Log($"[AI Debug] Bomb decision at {position} (player {player}): {decision}{detail}", this);
+        Debug.Log(
+            $"[AIデバッグ] ボム設置判定。現在セル={position}、プレイヤーのセル={player}、結果={decision}{detail}",
+            this);
 #endif
     }
 

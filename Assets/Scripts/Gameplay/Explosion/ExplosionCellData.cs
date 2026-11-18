@@ -16,7 +16,7 @@ public readonly struct ExplosionCellData
     public Vector3Int Direction { get; }
     public ExplosionCellType Type { get; }
 
-    public ExplosionCellData( Vector3Int position,Vector3Int direction,ExplosionCellType type)
+    public ExplosionCellData(Vector3Int position, Vector3Int direction, ExplosionCellType type)
     {
         Position = position;
         Direction = direction;

@@ -13,6 +13,9 @@ public enum MatchState
 /// <summary>試合状態、生存Character、勝者を保持します。</summary>
 public class GridBomberGameState : MonoBehaviour
 {
+    /// <summary>試合開始に必要な最低キャラクター数です。</summary>
+    private const int MinimumCharactersToStart = 2;
+
     public event Action<MatchState> StateChanged;
     public event Action<CharacterBase> MatchFinished;
     public event Action<int> AliveCharacterCountChanged;
@@ -38,17 +41,17 @@ public class GridBomberGameState : MonoBehaviour
         for (int i = 0; i < characters.Length; i++)
             RegisterCharacter(characters[i]);
 
-        if (_aliveCharacters.Count < 2)
+        if (_aliveCharacters.Count < MinimumCharactersToStart)
         {
             Debug.LogError(
-                $"試合を開始できません: 登録Character数={_aliveCharacters.Count}。最低2体必要です。",
+                $"試合開始に必要なキャラクター数が不足しています。登録数={_aliveCharacters.Count}",
                 this);
             ClearRegisteredCharacters();
             return false;
         }
 
         SetState(MatchState.Playing);
-        Debug.Log($"Match started: Characters={_aliveCharacters.Count}", this);
+        Debug.Log($"試合開始。参加キャラクター数={_aliveCharacters.Count}", this);
         return true;
     }
 
@@ -86,7 +89,7 @@ public class GridBomberGameState : MonoBehaviour
         AliveCharacterCountChanged?.Invoke(_aliveCharacters.Count);
 
         Debug.Log(
-            $"Character removed from match: Name={character.name}, Cause={cause}, Alive={_aliveCharacters.Count}",
+            $"キャラクターが脱落しました。名前={character.name}、原因={cause}、残り={_aliveCharacters.Count}体",
             this);
 
         if (State == MatchState.Playing && _aliveCharacters.Count <= 1)
@@ -100,7 +103,7 @@ public class GridBomberGameState : MonoBehaviour
         SetState(MatchState.Finished);
 
         Debug.Log(
-            Winner != null ? $"Match finished: Winner={Winner.name}" : "Match finished: Draw",
+            Winner != null ? $"試合終了。勝者={Winner.name}" : "試合終了。引き分けです。",
             this);
         MatchFinished?.Invoke(Winner);
     }

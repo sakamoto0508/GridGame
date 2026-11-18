@@ -12,6 +12,8 @@ public sealed class GridDangerMap
     }
 
     private readonly Dictionary<Vector3Int, float> _dangerTimes = new();
+
+    /// <summary>セル → 危険になるまでの秒数（Rebuild時点からの相対秒）。</summary>
     public IReadOnlyDictionary<Vector3Int, float> DangerTimes => _dangerTimes;
 
 #if UNITY_EDITOR
@@ -42,26 +44,28 @@ public sealed class GridDangerMap
     /// <summary>
     /// 指定したセルが何秒後に危険になるかを取得します。
     /// </summary>
-    /// <param name="position"></param>
-    /// <param name="seconds"></param>
-    /// <returns></returns>
+    /// <param name="position">調べるセル</param>
+    /// <param name="seconds">危険になるまでの秒数</param>
+    /// <returns>危険が予測されているセルならtrue</returns>
     public bool TryGetDangerTime(Vector3Int position, out float seconds)
         => _dangerTimes.TryGetValue(position, out seconds);
 
     /// <summary>
     /// Bombの爆発と連鎖爆発を含め、各セルが何秒後に危険になるかを予測します。
     /// </summary>
-    /// <param name="gridManager"></param>
-    /// <param name="virtualPosition"></param>
-    /// <param name="virtualPower"></param>
-    /// <param name="virtualFuseTime"></param>
+    /// <param name="gridManager">盤面</param>
+    /// <param name="virtualPosition">仮想Bombの位置。nullなら仮想Bombなし</param>
+    /// <param name="virtualPower">仮想Bombの火力</param>
+    /// <param name="virtualFuseTime">仮想Bombの爆発までの秒数</param>
     private void Rebuild(
         GridManager gridManager, Vector3Int? virtualPosition, int virtualPower, float virtualFuseTime)
     {
         _dangerTimes.Clear();
+
 #if UNITY_EDITOR
         DebugBuiltAt = Time.time;
 #endif
+
         if (gridManager == null)
             return;
 
@@ -73,8 +77,10 @@ public sealed class GridDangerMap
         }
 
         PropagateChainTimes(bombs);
+
         foreach (BombPrediction bomb in bombs)
             RegisterDangerCells(bomb);
+
         // 仮想Bombの安全確認でも落下予告を含め、落下予定列を逃げ先にしません。
         gridManager.GetComponent<EndPhaseManager>()?.AppendDanger(this);
     }
@@ -82,34 +88,39 @@ public sealed class GridDangerMap
     /// <summary>
     /// GridManagerからBombを収集し、爆発予測を作ります。
     /// </summary>
-    /// <param name="gridManager"></param>
-    /// <returns></returns>
+    /// <param name="gridManager">盤面</param>
+    /// <returns>未爆発Bombの爆発予測一覧</returns>
     private static List<BombPrediction> CollectBombs(GridManager gridManager)
     {
         List<BombPrediction> bombs = new();
         Vector3Int size = gridManager.Size;
         for (int x = 0; x < size.x; x++)
-        for (int y = 0; y < size.y; y++)
-        for (int z = 0; z < size.z; z++)
         {
-            Bomb bomb = gridManager.GetBomb(new Vector3Int(x, y, z));
-            if (bomb != null && bomb.State != BombState.Exploded)
+            for (int y = 0; y < size.y; y++)
             {
-                bombs.Add(CreatePrediction(gridManager, bomb.GridPosition,
-                    bomb.ExplosionPower, bomb.RemainingFuseTime));
+                for (int z = 0; z < size.z; z++)
+                {
+                    Bomb bomb = gridManager.GetBomb(new Vector3Int(x, y, z));
+                    if (bomb != null && bomb.State != BombState.Exploded)
+                    {
+                        bombs.Add(CreatePrediction(gridManager, bomb.GridPosition,
+                            bomb.ExplosionPower, bomb.RemainingFuseTime));
+                    }
+                }
             }
         }
+
         return bombs;
     }
 
     /// <summary>
     /// 指定した位置のBombの爆発予測を作ります。
     /// </summary>
-    /// <param name="gridManager"></param>
-    /// <param name="position"></param>
-    /// <param name="power"></param>
-    /// <param name="time"></param>
-    /// <returns></returns>
+    /// <param name="gridManager">盤面</param>
+    /// <param name="position">Bombの位置</param>
+    /// <param name="power">火力</param>
+    /// <param name="time">爆発までの秒数</param>
+    /// <returns>爆発予測</returns>
     private static BombPrediction CreatePrediction(
         GridManager gridManager, Vector3Int position, int power, float time)
     {
@@ -129,33 +140,35 @@ public sealed class GridDangerMap
         {
             changed = false;
             for (int sourceIndex = 0; sourceIndex < bombs.Count; sourceIndex++)
-            for (int targetIndex = 0; targetIndex < bombs.Count; targetIndex++)
             {
-                if (sourceIndex == targetIndex)
-                    continue;
-
-                BombPrediction source = bombs[sourceIndex];
-                BombPrediction target = bombs[targetIndex];
-                if (source.ExplosionTime < target.ExplosionTime &&
-                    Contains(source.AffectedCells, target.Position))
+                for (int targetIndex = 0; targetIndex < bombs.Count; targetIndex++)
                 {
-                    target.ExplosionTime = source.ExplosionTime;
-                    changed = true;
+                    if (sourceIndex == targetIndex)
+                        continue;
+
+                    BombPrediction source = bombs[sourceIndex];
+                    BombPrediction target = bombs[targetIndex];
+                    if (source.ExplosionTime < target.ExplosionTime &&
+                        Contains(source.AffectedCells, target.Position))
+                    {
+                        target.ExplosionTime = source.ExplosionTime;
+                        changed = true;
+                    }
                 }
             }
-        } while (changed);
+        }
+        while (changed);
     }
 
     /// <summary>
     /// Bombの爆風が届くセルを危険として登録します。
     /// </summary>
-    /// <param name="bomb"></param>
+    /// <param name="bomb">爆発予測</param>
     private void RegisterDangerCells(BombPrediction bomb)
     {
         foreach (Vector3Int position in bomb.AffectedCells)
         {
-            if (!_dangerTimes.TryGetValue(position, out float oldTime) ||
-                bomb.ExplosionTime < oldTime)
+            if (!_dangerTimes.TryGetValue(position, out float oldTime) || bomb.ExplosionTime < oldTime)
                 _dangerTimes[position] = bomb.ExplosionTime;
         }
     }
@@ -163,14 +176,17 @@ public sealed class GridDangerMap
     /// <summary>
     /// 指定したセルが、指定したセルのリストに含まれるかを判定します。
     /// </summary>
-    /// <param name="cells"></param>
-    /// <param name="position"></param>
-    /// <returns></returns>
+    /// <param name="cells">セルのリスト</param>
+    /// <param name="position">探すセル</param>
+    /// <returns>含まれていればtrue</returns>
     private static bool Contains(IReadOnlyList<Vector3Int> cells, Vector3Int position)
     {
         for (int i = 0; i < cells.Count; i++)
+        {
             if (cells[i] == position)
                 return true;
+        }
+
         return false;
     }
 }

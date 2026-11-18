@@ -10,7 +10,7 @@ public class ExplosionView : MonoBehaviour
     [SerializeField] private ExplosionVisualSettings _settings;
 
     /// <summary>指定された全セルへ、区分と方向に対応した爆風Effectを生成します。</summary>
-    public bool Show(GridManager gridManager,IReadOnlyList<ExplosionCellData> explosionCells)
+    public bool Show(GridManager gridManager, IReadOnlyList<ExplosionCellData> explosionCells)
     {
         if (gridManager == null)
         {
@@ -41,9 +41,10 @@ public class ExplosionView : MonoBehaviour
 
             // Bombの子にするとBomb破棄時に一緒に消えるため、親を設定せず生成します。
             ExplosionEffect effect = Instantiate(prefab, worldPosition, rotation);
+
             if (_settings.ScaleToCell)
-                effect.transform.localScale *= Vector3.Distance(gridManager.GetWorldPosition(Vector3Int.zero),
-                    gridManager.GetWorldPosition(Vector3Int.right));
+                effect.transform.localScale *= gridManager.CellSize;
+
             effect.Play(_settings.EffectDuration);
         }
 
@@ -57,13 +58,16 @@ public class ExplosionView : MonoBehaviour
         {
             case ExplosionCellType.Center:
                 return _settings.CenterPrefab;
+
             case ExplosionCellType.Middle:
                 return _settings.MiddlePrefab;
+
             case ExplosionCellType.BlockedEnd:
                 // BlockedEndが未設定なら通常のEndを代用します。
                 return _settings.BlockedEndPrefab != null
                     ? _settings.BlockedEndPrefab
                     : _settings.EndPrefab;
+
             default:
                 return _settings.EndPrefab;
         }

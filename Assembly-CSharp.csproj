@@ -52,11 +52,12 @@
     <Compile Include="Assets\Scripts\Gameplay\Item\ItemManager.cs" />
     <Compile Include="Assets\Scripts\Character\Player\CharacterSpawner.cs" />
     <Compile Include="Assets\Scripts\Character\Components\BlockPlacementComponent.cs" />
+    <Compile Include="Assets\Scripts\Tests\EditMode\GridPathfindingSystemTests.cs" />
     <Compile Include="Assets\Scripts\Camera\GridCameraSideController.cs" />
-    <Compile Include="Assets\Scripts\AI\Tasks\AIAction.cs" />
     <Compile Include="Assets\Scripts\Gameplay\Item\ItemSettings.cs" />
     <Compile Include="Assets\Scripts\Core\Gravity\GridGravitySystem.cs" />
     <Compile Include="Assets\Scripts\UI\GameHud.cs" />
+    <Compile Include="Assets\Scripts\Core\Utility\RandomUtility.cs" />
     <Compile Include="Assets\Scripts\Core\Manager\GridManager.cs" />
     <Compile Include="Assets\Scripts\Character\Common\CharacterBase.cs" />
     <Compile Include="Assets\Scripts\Gameplay\Item\Item.cs" />
@@ -80,6 +81,7 @@
     <Compile Include="Assets\Scripts\AI\Behavior\EnemyBrain.cs" />
     <Compile Include="Assets\Scripts\Gameplay\Stage\StageGenerator.cs" />
     <Compile Include="Assets\Scripts\Gameplay\Bomb\Data\BombVisualSettings.cs" />
+    <Compile Include="Assets\Scripts\Tests\EditMode\ExplosionSystemTests.cs" />
     <Compile Include="Assets\Scripts\UI\MatchSetupUI.cs" />
     <Compile Include="Assets\Scripts\UI\CyberpunkPanelGraphic.cs" />
     <Compile Include="Assets\Scripts\Gameplay\Item\ItemVisualSettings.cs" />
@@ -98,7 +100,6 @@
     <Compile Include="Assets\Scripts\Gameplay\Item\ItemPickupBurst.cs" />
     <Compile Include="Assets\Scripts\Gameplay\Explosion\ExplosionView.cs" />
     <Compile Include="Assets\Scripts\AI\Pathfinding\GridPathfindingSystem.cs" />
-    <Compile Include="Assets\Scripts\GameModes\EndPhase\EndPhaseController.cs" />
     <Compile Include="Assets\Scripts\GameModes\GridBomberGameState.cs" />
     <Compile Include="Assets\Scripts\UI\Data\GameHudSettings.cs" />
     <Compile Include="Assets\Scripts\Gameplay\Bomb\NeonBombView.cs" />
@@ -113,7 +114,6 @@
     <Compile Include="Assets\Scripts\Gameplay\Bomb\Data\BombSettings.cs" />
     <Compile Include="Assets\Scripts\Gameplay\Stage\BoundaryBlockView.cs" />
     <Compile Include="Assets\Scripts\Audio\AudioManager.cs" />
-    <Compile Include="Assets\Scripts\Core\Events\GameEvents.cs" />
     <Compile Include="Assets\Scripts\Core\Pooling\PooledGridObject.cs" />
     <Compile Include="Assets\Scripts\Camera\CameraSideSettings.cs" />
     <Compile Include="Assets\Scripts\Character\Components\CharacterDeathVisualSettings.cs" />
@@ -123,6 +123,7 @@
     <Compile Include="Assets\Scripts\GameModes\MatchLaunchRequest.cs" />
     <Compile Include="Assets\Scripts\Character\Components\InventoryComponent.cs" />
     <Compile Include="Assets\Scripts\Character\Player\PlayerController.cs" />
+    <Compile Include="Assets\Scripts\Tests\EditMode\GridTestUtility.cs" />
     <Compile Include="Assets\Scripts\Tests\EditMode\GridUtilityTests.cs" />
     <Compile Include="Assets\Scripts\Character\Common\RobotVisualSettings.cs" />
     <Compile Include="Assets\Scripts\Gameplay\Explosion\Data\NeonExplosionStyleSettings.cs" />
