@@ -1,4 +1,3 @@
-[GridGame_README.md](https://github.com/user-attachments/files/35059011/GridGame_README.md)
 # NEON DETONATOR（GridGame）
 
 **立体グリッド上で移動・ジャンプ・落下を駆使し、爆弾で戦う3Dアクションゲームです。** 爆発の危険を予測して行動する敵AIを中心に実装しています。
